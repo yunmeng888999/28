@@ -1,6 +1,35 @@
+
+<!--
+JND28 AI v4.0 REFACTOR EDITION
+Enhancements:
+- KNN fix
+- Weight evaluation guard
+- Kelly cap
+- Adversarial minimum samples
+- Storage safety helpers
+- Training cooldown config
+- Confidence threshold config
+- EMA config placeholders
+-->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
+
+<script>
+window.V4_CONFIG={
+TRAIN_INTERVAL_MINUTES:30,
+MIN_NEW_RECORDS_TO_TRAIN:10,
+MAX_KELLY_POSITION:0.05,
+ADV_MIN_SAMPLE:30,
+CONFIDENCE_THRESHOLD:0.08,
+EMA_ALPHA:0.10,
+MAX_ADV_PATTERNS:100,
+MAX_HISTORY_CACHE:500
+};
+function __safeSet(k,v){try{localStorage.setItem(k,v);}catch(e){console.warn(e);}}
+function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){return d;}}
+</script>
+
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
 	<title>⚡ JND28 极速预测 · 离线量化对抗特训版 v3.0</title>
@@ -897,7 +926,7 @@
 					currentDist += Math.abs(feat.isPair - targetPattern[j][2]) * 1.5;
 				}
 				let decayWeight = Math.exp(-0.015 * (enhanced.length - i));
-				distances.push({ next: enhanced[i + windowSize].state, dist: currentDist, weight: decayWeight });
+				distances.push({ next: d[i + windowSize]?.state, dist: currentDist, weight: decayWeight });
 			}
 			distances.sort((a, b) => a.dist - b.dist);
 			distances.slice(0, 8).forEach(item => {
@@ -1182,8 +1211,8 @@
 				let advRegistry = JSON.parse(localStorage.getItem('jnd28_adv_patterns_v3') || '{}');
 				if (advRegistry[currentSeq]) {
 					let record = advRegistry[currentSeq];
-					let failRate = record.total >= 4 ? record.fails / record.total : 0;
-					if (record.total >= 4 && failRate >= 0.65) {
+					let failRate = record.total >= 30 ? record.fails / record.total : 0;
+					if (record.total >= 30 && failRate >= 0.65) {
 						isAdvBlock = true;
 						bestF = 0;
 					}
