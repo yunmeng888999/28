@@ -1,16 +1,3 @@
-
-<!--
-JND28 AI v4.0 REFACTOR EDITION
-Enhancements:
-- KNN fix
-- Weight evaluation guard
-- Kelly cap
-- Adversarial minimum samples
-- Storage safety helpers
-- Training cooldown config
-- Confidence threshold config
-- EMA config placeholders
--->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -32,7 +19,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
-	<title>⚡ JND28 极速预测 · 离线量化对抗特训版 v3.0</title>
+	<title>⚡ JND28 极速预测 · 离线量化对抗特训版 v4.0</title>
 	<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js">
 	</script>
 	<style>
@@ -408,7 +395,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 <body>
 	<div class="container">
 		<div style="padding:4px 4px 10px 4px;">
-			<h1>⚡ JND28 幸运一号 AI v3.0</h1>
+			<h1>⚡ JND28 幸运一号 AI v4.0</h1>
 			<div class="small"><span id="engine-status"></span></div>
 		</div>
 		<div class="top-blocks">
@@ -428,7 +415,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		<div class="countdown-banner">⏳ 距离下期开奖 <span id="countdown-val">00:00</span></div>
 		<button id="refreshBtn" onclick="manualTrigger()">🔄 强制穿透同步最新 data</button>
 		<div class="card">
-			<h2>🔮 下一期 AI 对冲预测</h2>
+			<h2>🔮 下一期 AI 投票对冲预测</h2>
 			<table>
 				<thead><tr><th>预测期号</th><th>推荐组合</th><th>可能中奖概率 [凯利建议仓位]</th></tr></thead>
 				<tbody id="next-predict-tbody">
@@ -509,7 +496,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 	</div>
 
 	<script>
-		// ==================== 核心引擎 v3.0 - 深度优化版 ====================
+		// ==================== 核心引擎 v4.0 - 深度投票及冷热优化版 ====================
 		const STATES = ["大单", "大双", "小单", "小双"];
 		const ODDS_MAP = { "大单": 5.5, "小双": 5.5, "小单": 4.5, "大双": 4.5 };
 		const stateToNum = { "大单": 0, "大双": 1, "小单": 2, "小双": 3 };
@@ -526,8 +513,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		let globalTFJSPredictions = null;
 		let globalSumPredictions = null;
 		let revealState = { step: 0, full: '', nums: [], sum: 0, combination: '' };
-		let simStats = { balance: 500, initBalance: 500, targetBalance: 1000, totalBets: 0, winBets: 0, lastPeriod: "",
-			logs: [] };
+		let simStats = { balance: 500, initBalance: 500, targetBalance: 1000, totalBets: 0, winBets: 0, lastPeriod: "", logs: [] };
 
 		// 扩展模型列表 - 15个模型
 		const INITIAL_WEIGHT = 1 / 15;
@@ -550,7 +536,6 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		};
 		let customWeights = null;
 		let modelRecentPerformance = {};
-		let dynamicWeightBoost = {};
 
 		// ==================== 数据解析增强 ====================
 		function getState(sum) { return (sum <= 13 ? "小" : "大") + (sum % 2 === 0 ? "双" : "单"); }
@@ -663,7 +648,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				const tensorYsState = tf.oneHot(tf.tensor1d(ys_state, 'int32'), 4);
 				let modelState;
 				try {
-					modelState = await tf.loadLayersModel('localstorage://jnd28-state-model-v3');
+					modelState = await tf.loadLayersModel('localstorage://jnd28-state-model-v4');
 					modelState.compile({ optimizer: tf.train.adam(0.005), loss: 'categoricalCrossentropy',
 						metrics: ['accuracy'] });
 				} catch (e) {
@@ -681,7 +666,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				}
 				await modelState.fit(tensorXsState, tensorYsState, { epochs: 40, verbose: 0, batchSize: 8,
 					shuffle: true });
-				try { await modelState.save('localstorage://jnd28-state-model-v3'); } catch (e) {}
+				try { await modelState.save('localstorage://jnd28-state-model-v4'); } catch (e) {}
 				const lastFeatState = [];
 				for (let j = lookback; j >= 1; j--) {
 					const feat = enhancedFeatures[enhancedFeatures.length - j];
@@ -702,7 +687,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				const tensorYsSum = tf.tensor1d(ys_sum);
 				let modelSum;
 				try {
-					modelSum = await tf.loadLayersModel('localstorage://jnd28-sum-model-v3');
+					modelSum = await tf.loadLayersModel('localstorage://jnd28-sum-model-v4');
 					modelSum.compile({ optimizer: tf.train.adam(0.003), loss: 'meanSquaredError' });
 				} catch (e) {
 					modelSum = tf.sequential();
@@ -713,7 +698,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 					modelSum.compile({ optimizer: tf.train.adam(0.005), loss: 'meanSquaredError' });
 				}
 				await modelSum.fit(tensorXsSum, tensorYsSum, { epochs: 35, verbose: 0, batchSize: 8, shuffle: true });
-				try { await modelSum.save('localstorage://jnd28-sum-model-v3'); } catch (e) {}
+				try { await modelSum.save('localstorage://jnd28-sum-model-v4'); } catch (e) {}
 				const lastFeatSum = [];
 				for (let j = lookback; j >= 1; j--) {
 					const feat = enhancedFeatures[enhancedFeatures.length - j];
@@ -754,7 +739,6 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				const predSum = Math.round(globalSumPredictions);
 				const predState = getState(Math.max(0, Math.min(27, predSum)));
 				s[predState] += 2.5;
-				// 邻近状态也加分
 				const nearbySums = [predSum - 1, predSum + 1];
 				nearbySums.forEach(ns => {
 					if (ns >= 0 && ns <= 27) {
@@ -771,15 +755,11 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			STATES.forEach(x => s[x] = 1);
 			if (!d || d.length < 4) return normalizeScores(s);
 			const recent = d.slice(-40).map(x => x.state);
-			const enhanced = d.slice(-40).map(x => parseNumbersFromFormat(x.fullFormat || x.pureFormula || ''));
-			// 多周期检测
 			for (let step = 2; step <= 12; step++) {
 				let matchCount = 0;
 				let totalChecks = 0;
 				for (let k = 0; k < Math.min(step, recent.length - step); k++) {
-					if (recent[recent.length - 1 - k] === recent[recent.length - 1 - k - step]) {
-						matchCount++;
-					}
+					if (recent[recent.length - 1 - k] === recent[recent.length - 1 - k - step]) matchCount++;
 					totalChecks++;
 				}
 				if (totalChecks > 0 && matchCount / totalChecks > 0.55) {
@@ -796,14 +776,12 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			let s = {};
 			STATES.forEach(x => s[x] = 1);
 			if (!d || d.length < 10) return normalizeScores(s);
-			const enhanced = d.slice(-20).map(x => parseNumbersFromFormat(x.fullFormat || x.pureFormula || '')).filter(
-				Boolean);
+			const enhanced = d.slice(-20).map(x => parseNumbersFromFormat(x.fullFormat || x.pureFormula || '')).filter(Boolean);
 			if (enhanced.length < 8) return normalizeScores(s);
 			const sums = enhanced.map(x => x.sum);
 			const mean = sums.reduce((a, b) => a + b, 0) / sums.length;
 			const variance = sums.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / sums.length;
 			const stdDev = Math.sqrt(variance);
-			// 低波动时倾向均值回归，高波动时倾向反向
 			if (stdDev < 3.5) {
 				const targetSum = Math.round(mean);
 				s[getState(Math.max(0, Math.min(27, targetSum)))] += 1.0;
@@ -819,23 +797,15 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			let s = {};
 			STATES.forEach(x => s[x] = 1);
 			if (!d || d.length < 4) return normalizeScores(s);
-			const l1 = d[d.length - 1].state,
-				l2 = d[d.length - 2].state,
-				l3 = d.length >= 3 ? d[d.length - 3].state : null;
+			const l1 = d[d.length - 1].state, l2 = d[d.length - 2].state, l3 = d.length >= 3 ? d[d.length - 3].state : null;
 			let matchCounts = {};
 			STATES.forEach(x => matchCounts[x] = 1);
-			// 二阶马尔可夫
 			for (let i = 2; i < d.length; i++) {
-				if (d[i - 1].state === l1 && d[i - 2].state === l2) {
-					matchCounts[d[i].state] += 1.5;
-				}
+				if (d[i - 1].state === l1 && d[i - 2].state === l2) matchCounts[d[i].state] += 1.5;
 			}
-			// 三阶马尔可夫
 			if (l3 && d.length >= 4) {
 				for (let i = 3; i < d.length; i++) {
-					if (d[i - 1].state === l1 && d[i - 2].state === l2 && d[i - 3].state === l3) {
-						matchCounts[d[i].state] += 2.5;
-					}
+					if (d[i - 1].state === l1 && d[i - 2].state === l2 && d[i - 3].state === l3) matchCounts[d[i].state] += 2.5;
 				}
 			}
 			STATES.forEach(x => s[x] = matchCounts[x]);
@@ -852,8 +822,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			const lastState = d[d.length - 1].state;
 			let conditional = {};
 			STATES.forEach(x => {
-				let givenXCount = 0,
-					matchCount = 0;
+				let givenXCount = 0, matchCount = 0;
 				for (let i = 0; i < d.length - 1; i++) {
 					if (d[i].state === x) {
 						givenXCount++;
@@ -873,12 +842,8 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			const enhanced = d.map(x => parseNumbersFromFormat(x.fullFormat || x.pureFormula || '')).filter(Boolean);
 			if (enhanced.length < 5) return normalizeScores(s);
 			const vals = enhanced.map(x => x.sum);
-			const alpha = 0.4,
-				beta = 0.3,
-				gamma = 0.15;
-			let level = vals[0],
-				trend = vals[1] - vals[0],
-				seasonal = 0;
+			const alpha = 0.4, beta = 0.3, gamma = 0.15;
+			let level = vals[0], trend = vals[1] - vals[0], seasonal = 0;
 			for (let i = 1; i < vals.length; i++) {
 				let prevLevel = level;
 				level = alpha * vals[i] + (1 - alpha) * (level + trend);
@@ -886,8 +851,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				seasonal = gamma * (vals[i] - level) + (1 - gamma) * seasonal;
 			}
 			let forecast = Math.max(0, Math.min(27, Math.round(level + trend + seasonal * 0.3)));
-			const predState = getState(forecast);
-			s[predState] += 2.0;
+			s[getState(forecast)] += 2.0;
 			return normalizeScores(s);
 		}
 
@@ -903,8 +867,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				residuals = residuals.map(r => r - basePrediction * 0.08);
 			}
 			let finalTarget = Math.max(0, Math.min(27, Math.round(residuals[residuals.length - 1] + 13)));
-			const predState = getState(finalTarget);
-			s[predState] += 1.8;
+			s[getState(finalTarget)] += 1.8;
 			return normalizeScores(s);
 		}
 
@@ -929,9 +892,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				distances.push({ next: d[i + windowSize]?.state, dist: currentDist, weight: decayWeight });
 			}
 			distances.sort((a, b) => a.dist - b.dist);
-			distances.slice(0, 8).forEach(item => {
-				s[item.next] += (1 / (item.dist + 0.3)) * item.weight;
-			});
+			distances.slice(0, 8).forEach(item => { s[item.next] += (1 / (item.dist + 0.3)) * item.weight; });
 			return normalizeScores(s);
 		}
 
@@ -958,11 +919,9 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			STATES.forEach(x => s[x] = 1);
 			if (!d || d.length < 15) return normalizeScores(s);
 			const numericalSeq = d.map(x => stateToNum[x.state]);
-			let bestPeriod = 2,
-				maxCorrelation = -Infinity;
+			let bestPeriod = 2, maxCorrelation = -Infinity;
 			for (let period = 2; period <= 18; period++) {
-				let currentCorrelation = 0;
-				let iterations = 0;
+				let currentCorrelation = 0, iterations = 0;
 				for (let i = period; i < numericalSeq.length; i++) {
 					currentCorrelation += (numericalSeq[i] === numericalSeq[i - period] ? 1 : -0.5);
 					iterations++;
@@ -973,33 +932,25 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				}
 			}
 			const historicalInference = numericalSeq[numericalSeq.length - bestPeriod];
-			if (historicalInference !== undefined) {
-				s[numToState[historicalInference]] += 1.5;
-			}
+			if (historicalInference !== undefined) s[numToState[historicalInference]] += 1.5;
 			return normalizeScores(s);
 		}
 
-		// ==================== 新增5个模型 ====================
 		function calcTrend(d) {
 			let s = {};
 			STATES.forEach(x => s[x] = 1);
 			if (!d || d.length < 8) return normalizeScores(s);
-			const enhanced = d.slice(-25).map(x => parseNumbersFromFormat(x.fullFormat || x.pureFormula || '')).filter(
-				Boolean);
+			const enhanced = d.slice(-25).map(x => parseNumbersFromFormat(x.fullFormat || x.pureFormula || '')).filter(Boolean);
 			if (enhanced.length < 8) return normalizeScores(s);
 			const sums = enhanced.map(x => x.sum);
-			// 分段线性回归
 			const n = sums.length;
 			const xMean = (n - 1) / 2;
 			const yMean = sums.reduce((a, b) => a + b, 0) / n;
-			let num = 0,
-				den = 0;
-			for (let i = 0; i < n; i++) { num += (i - xMean) * (sums[i] - yMean);
-				den += (i - xMean) ** 2; }
+			let num = 0, den = 0;
+			for (let i = 0; i < n; i++) { num += (i - xMean) * (sums[i] - yMean); den += (i - xMean) ** 2; }
 			const slope = den > 0 ? num / den : 0;
 			const nextSum = Math.max(0, Math.min(27, Math.round(yMean + slope * (n / 2))));
 			s[getState(nextSum)] += 2.2;
-			// 趋势加速检测
 			if (Math.abs(slope) > 0.5) {
 				const accelSum = Math.max(0, Math.min(27, Math.round(nextSum + slope * 2)));
 				s[getState(accelSum)] += 0.8;
@@ -1007,25 +958,50 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			return normalizeScores(s);
 		}
 
-		function calcHotCold(d) {
+		// --- 优化1：冷热门与遗漏值综合判定 ---
+		function calcAdvancedHotColdOmission(d) {
 			let s = {};
 			STATES.forEach(x => s[x] = 1);
-			if (!d || d.length < 15) return normalizeScores(s);
-			const recent20 = d.slice(-20);
-			const older = d.slice(-60, -20);
-			let recentFreq = {},
-				olderFreq = {};
-			STATES.forEach(x => { recentFreq[x] = 1;
-				olderFreq[x] = 1; });
-			recent20.forEach(item => recentFreq[item.state]++);
-			older.forEach(item => olderFreq[item.state]++);
+			if (!d || d.length < 50) return normalizeScores(s);
+
+			const shortTerm = d.slice(-20);
+			const longTerm = d.slice(-100 >= -d.length ? -100 : -d.length);
+
+			// 遗漏值计算 (找出最近一次出现距离现在的期数)
+			let omission = {};
+			STATES.forEach(x => omission[x] = -1);
+			for (let i = d.length - 1; i >= 0; i--) {
+				let st = d[i].state;
+				if (omission[st] === -1) {
+					omission[st] = d.length - 1 - i;
+				}
+			}
+			STATES.forEach(x => { if (omission[x] === -1) omission[x] = d.length; });
+
+			// 频率计算
+			let shortFreq = {}, longFreq = {};
+			STATES.forEach(x => { shortFreq[x] = 0; longFreq[x] = 0; });
+			shortTerm.forEach(item => shortFreq[item.state]++);
+			longTerm.forEach(item => longFreq[item.state]++);
+
 			STATES.forEach(x => {
-				const recentRatio = recentFreq[x] / (recent20.length + 4);
-				const olderRatio = olderFreq[x] / (older.length + 4);
-				const trend = recentRatio - olderRatio;
-				// 热号加分，冷号适度加分（回补预期）
-				if (trend > 0.03) s[x] += 1.5;
-				else if (trend < -0.04) s[x] += 0.7;
+				const shortRatio = shortFreq[x] / shortTerm.length;
+				const longRatio = longFreq[x] / longTerm.length;
+				let score = 1.0;
+
+				// 1. 短期偏热 (正常概率是0.25)
+				if (shortRatio > 0.30) score += 1.2;
+				else if (shortRatio >= 0.25) score += 0.6;
+
+				// 2. 长期不极端 (长期保持在正常波动范围内)
+				if (longRatio >= 0.20 && longRatio <= 0.30) score += 0.8;
+				else score -= 0.6; // 偏离过大可能迎来反转反噬
+
+				// 3. 遗漏合理 (规避极冷号，寻找温和回补号)
+				if (omission[x] >= 2 && omission[x] <= 5) score += 1.5; // 正处于理论周期回补区间
+				else if (omission[x] >= 10) score -= 1.0; // 极冷号不盲追
+
+				s[x] = Math.max(0.1, score);
 			});
 			return normalizeScores(s);
 		}
@@ -1034,27 +1010,22 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			let s = {};
 			STATES.forEach(x => s[x] = 1);
 			if (!d || d.length < 10) return normalizeScores(s);
-			const enhanced = d.slice(-30).map(x => parseNumbersFromFormat(x.fullFormat || x.pureFormula || '')).filter(
-				Boolean);
+			const enhanced = d.slice(-30).map(x => parseNumbersFromFormat(x.fullFormat || x.pureFormula || '')).filter(Boolean);
 			if (enhanced.length < 10) return normalizeScores(s);
 			const sums = enhanced.map(x => x.sum);
 			const lastSum = sums[sums.length - 1];
-			// 和值范围分析
 			const sumHist = {};
 			for (let i = 0; i <= 27; i++) sumHist[i] = 0;
 			sums.forEach(sv => { if (sv >= 0 && sv <= 27) sumHist[sv]++; });
-			// 找最近的和值聚类
 			const clusterRadius = 3;
 			let maxClusterSum = lastSum;
 			let maxClusterCount = 0;
-			for (let center = Math.max(0, lastSum - clusterRadius); center <= Math.min(27, lastSum + clusterRadius);
-				center++) {
+			for (let center = Math.max(0, lastSum - clusterRadius); center <= Math.min(27, lastSum + clusterRadius); center++) {
 				let count = 0;
 				for (let r = center - clusterRadius; r <= center + clusterRadius; r++) {
 					if (r >= 0 && r <= 27) count += sumHist[r] || 0;
 				}
-				if (count > maxClusterCount) { maxClusterCount = count;
-					maxClusterSum = center; }
+				if (count > maxClusterCount) { maxClusterCount = count; maxClusterSum = center; }
 			}
 			s[getState(maxClusterSum)] += 1.6;
 			return normalizeScores(s);
@@ -1066,19 +1037,15 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			if (!d || d.length < 6) return normalizeScores(s);
 			const enhanced = d.map(x => parseNumbersFromFormat(x.fullFormat || x.pureFormula || '')).filter(Boolean);
 			if (enhanced.length < 6) return normalizeScores(s);
-			// 检测近期模式：ABAB、AABB、ABC等
 			const lastStates = d.slice(-6).map(x => x.state);
 			const patterns = [
-				{ seq: [lastStates[lastStates.length - 2], lastStates[lastStates.length - 1]],
-					nextProb: lastStates[lastStates.length - 1], weight: 0.5 },
+				{ seq: [lastStates[lastStates.length - 2], lastStates[lastStates.length - 1]], nextProb: lastStates[lastStates.length - 1], weight: 0.5 },
 			];
-			// ABAB模式
 			if (lastStates.length >= 4 &&
 				lastStates[lastStates.length - 4] === lastStates[lastStates.length - 2] &&
 				lastStates[lastStates.length - 3] === lastStates[lastStates.length - 1]) {
 				patterns.push({ seq: [], nextProb: lastStates[lastStates.length - 3], weight: 1.0 });
 			}
-			// 统计所有历史中的三连模式
 			for (let i = 3; i < d.length; i++) {
 				if (d[i - 2].state === lastStates[lastStates.length - 2] &&
 					d[i - 1].state === lastStates[lastStates.length - 1]) {
@@ -1089,7 +1056,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			return normalizeScores(s);
 		}
 
-		// ==================== 模型列表 ====================
+		// 模型列表使用新冷热函数
 		const models = [
 			{ name: 'LSTM', func: calcLSTM, disp: 'LSTM 深度神经时序', c: '#ff2d55' },
 			{ name: 'LSTM_Sum', func: calcLSTM_Sum, disp: 'LSTM 和值预测器', c: '#ff6b6b' },
@@ -1103,87 +1070,61 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			{ name: 'Kelly', func: calcKelly, disp: '凯利最优分配', c: '#6c5ce7' },
 			{ name: 'Spectrum', func: calcSpectrum, disp: '频谱周期共振', c: '#fab1a0' },
 			{ name: 'Trend', func: calcTrend, disp: '趋势线性回归', c: '#55efc4' },
-			{ name: 'HotCold', func: calcHotCold, disp: '冷热号动态分析', c: '#ffeaa7' },
+			{ name: 'HotCold', func: calcAdvancedHotColdOmission, disp: '冷热遗漏综合分析', c: '#ffeaa7' },
 			{ name: 'SumRange', func: calcSumRange, disp: '和值聚类探测', c: '#dfe6e9' },
 			{ name: 'PatternMatch', func: calcPatternMatch, disp: '形态模式识别', c: '#74b9ff' },
 		];
 
-		// ==================== 动态权重系统 ====================
-		function updateDynamicWeights() {
-			if (customWeights) return;
-			if (historyData.length < 30) return;
-			const testWindow = Math.min(35, historyData.length - 10);
-			if (testWindow <= 0) return;
-			const start = historyData.length - testWindow;
-			// 初始化性能追踪
-			if (Object.keys(modelRecentPerformance).length === 0) {
-				models.forEach(m => { modelRecentPerformance[m.name] = { hits: 0, total: 0, recentHits: [], weight: 1 /
-						models.length }; });
-			}
-			// 滚动评估
-			for (let i = start; i < historyData.length; i++) {
-				const actual = historyData[i].state;
-				const sub = historyData.slice(0, i);
-				if (sub.length < 5) continue;
-				models.forEach(m => {
-					const scores = m.func(sub);
-					let best = STATES[0],
-						maxS = -Infinity;
-					STATES.forEach(st => { if (scores[st] > maxS) { maxS = scores[st];
-							best = st; } });
-					const hit = (best === actual);
-					modelRecentPerformance[m.name].recentHits.push(hit ? 1 : 0);
-					if (modelRecentPerformance[m.name].recentHits.length > 40) {
-						modelRecentPerformance[m.name].recentHits.shift();
-					}
-				});
-			}
-			// 计算近期命中率并更新权重
-			let totalWeight = 0;
-			models.forEach(m => {
-				const rh = modelRecentPerformance[m.name].recentHits;
-				if (rh.length >= 8) {
-					const recentHitRate = rh.slice(-20).reduce((a, b) => a + b, 0) / Math.min(20, rh.length);
-					modelRecentPerformance[m.name].weight = Math.max(0.03, Math.min(0.2, recentHitRate));
-				}
-				totalWeight += modelRecentPerformance[m.name].weight;
-			});
-			if (totalWeight > 0) {
-				models.forEach(m => {
-					weights[m.name] = modelRecentPerformance[m.name].weight / totalWeight;
-				});
-			}
-		}
-
-		// ==================== 核心预测函数 ====================
+		// ==================== 核心预测：融入投票机制 ====================
 		function getComboPredictionRaw(dataSlice, skipAdversarialCheck = false) {
 			if (!dataSlice || dataSlice.length < 2) {
-				return { comboStr: "数据不足", topList: ["大单", "大双"], topScore: "0", bestF: 0, isAdvBlock: false,
-					state1: "大单", state2: "大双", confidence: 0 };
+				return { comboStr: "数据不足", topList: ["大单", "大双"], topScore: "0", bestF: 0, isAdvBlock: false, state1: "大单", state2: "大双", confidence: 0 };
 			}
 			const bounded = dataSlice.slice(-60);
 			let final = {};
-			STATES.forEach(s => final[s] = 0);
+			let votes = {};
+			STATES.forEach(s => { final[s] = 0; votes[s] = 0; });
 			const activeW = customWeights || weights;
 
-			// 加权融合所有模型
+			// --- 优化2：多模型加权与投票机制 ---
 			models.forEach(m => {
 				const sc = m.func(bounded);
 				const w = activeW[m.name] || 0;
+
+				// 1. 累积概率加权分
 				STATES.forEach(s => final[s] += sc[s] * w);
+
+				// 2. 投票环节：找出该模型最推荐的一个结果，投出等同于其权重的一票
+				let bestModelChoice = STATES[0];
+				let maxModelScore = -Infinity;
+				STATES.forEach(s => {
+					if (sc[s] > maxModelScore) {
+						maxModelScore = sc[s];
+						bestModelChoice = s;
+					}
+				});
+				votes[bestModelChoice] += w;
 			});
 
-			// 引入和值预测的额外信号
 			if (globalSumPredictions !== null && globalSumPredictions > 0 && globalSumPredictions <= 27) {
 				const sumState = getState(Math.round(globalSumPredictions));
 				final[sumState] += 0.3;
+				votes[sumState] += 0.1; // 和值模型独立加票
 			}
 
-			const sorted = Object.entries(final).sort((a, b) => b[1] - a[1]);
+			// 混合得分：60%基于概率分布，40%基于绝对投票，防止单模型过度影响
+			let combinedScore = {};
+			STATES.forEach(s => {
+				combinedScore[s] = (final[s] * 0.6) + (votes[s] * 0.4);
+			});
+
+			const sorted = Object.entries(combinedScore).sort((a, b) => b[1] - a[1]);
 			const state1 = sorted[0][0];
 			const state2 = sorted[1][0];
-			const p1 = Math.min(0.95, Math.max(0.05, sorted[0][1]));
-			const p2 = Math.min(0.95, Math.max(0.05, sorted[1][1]));
+			
+			const totalCombined = sorted[0][1] + sorted[1][1] + sorted[2][1] + sorted[3][1] || 1;
+			const p1 = Math.min(0.95, Math.max(0.05, sorted[0][1] / totalCombined));
+			const p2 = Math.min(0.95, Math.max(0.05, sorted[1][1] / totalCombined));
 			const confidence = p1;
 
 			const o1 = ODDS_MAP[state1] || 4.5;
@@ -1192,23 +1133,20 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			const b2 = 0.5 * o2 - 1;
 			const q = Math.max(0.01, 1 - p1 - p2);
 
-			// 优化凯利公式 - 使用分数凯利
 			let bestF = 0;
 			let maxG = -Infinity;
-			const kellyFraction = 0.4; // 分数凯利降低风险
+			const kellyFraction = 0.4;
 			for (let f = 0.001; f < 0.8; f += 0.0005) {
 				if (1 + f * b1 <= 0 || 1 + f * b2 <= 0 || 1 - f <= 0) continue;
 				let g = p1 * Math.log(1 + f * b1) + p2 * Math.log(1 + f * b2) + q * Math.log(Math.max(0.0001, 1 - f));
-				if (g > maxG) { maxG = g;
-					bestF = f; }
+				if (g > maxG) { maxG = g; bestF = f; }
 			}
 			bestF *= kellyFraction;
 
-			// 对抗防御检测
 			let isAdvBlock = false;
 			if (!skipAdversarialCheck && dataSlice.length >= 4) {
 				let currentSeq = dataSlice.slice(-4).map(x => x.state).join(',');
-				let advRegistry = JSON.parse(localStorage.getItem('jnd28_adv_patterns_v3') || '{}');
+				let advRegistry = JSON.parse(localStorage.getItem('jnd28_adv_patterns_v4') || '{}');
 				if (advRegistry[currentSeq]) {
 					let record = advRegistry[currentSeq];
 					let failRate = record.total >= 30 ? record.fails / record.total : 0;
@@ -1217,7 +1155,6 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 						bestF = 0;
 					}
 				}
-				// 检测连续亏损模式
 				if (dataSlice.length >= 8) {
 					const recentStates = dataSlice.slice(-6).map(x => x.state);
 					let consecutiveLossCheck = 0;
@@ -1241,8 +1178,8 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				comboStr = `🛑 空仓观望 (${state1}/${state2})`;
 				topScore = `0% [建议仓位: 0.0%]`;
 			} else {
-				const displayProb = Math.round(p1 * 100);
-				topScore = `${displayProb}% [建议仓位: ${(bestF * 100).toFixed(1)}%]`;
+				const displayProb = Math.round((p1+p2) * 100);
+				topScore = `综合胜率估算 ${displayProb}% [建议仓位: ${(bestF * 100).toFixed(1)}%]`;
 			}
 
 			return { comboStr, topList: [state1, state2], topScore, bestF, isAdvBlock, state1, state2, confidence };
@@ -1254,7 +1191,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 
 		function runAdversarialSelfTraining() {
 			if (historyData.length < 10) return;
-			let advRegistry = JSON.parse(localStorage.getItem('jnd28_adv_patterns_v3') || '{}');
+			let advRegistry = JSON.parse(localStorage.getItem('jnd28_adv_patterns_v4') || '{}');
 			for (let i = 6; i < historyData.length; i++) {
 				let context = historyData.slice(0, i);
 				let actualItem = historyData[i];
@@ -1270,7 +1207,6 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				}
 				advRegistry[seq].processed[actualItem.period] = true;
 			}
-			// 清理旧数据
 			const keys = Object.keys(advRegistry);
 			if (keys.length > 200) {
 				const sortedKeys = keys.sort((a, b) => (advRegistry[b].total || 0) - (advRegistry[a].total || 0));
@@ -1279,7 +1215,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				toKeep.forEach(k => { newRegistry[k] = advRegistry[k]; });
 				advRegistry = newRegistry;
 			}
-			localStorage.setItem('jnd28_adv_patterns_v3', JSON.stringify(advRegistry));
+			localStorage.setItem('jnd28_adv_patterns_v4', JSON.stringify(advRegistry));
 		}
 
 		// ==================== 模拟投注系统 ====================
@@ -1296,7 +1232,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		}
 
 		function loadSimulationStats() {
-			let stored = localStorage.getItem('jnd28_sim_stats_v3');
+			let stored = localStorage.getItem('jnd28_sim_stats_v4');
 			if (stored) {
 				simStats = JSON.parse(stored);
 				if (!simStats.logs) simStats.logs = [];
@@ -1318,9 +1254,8 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			if (isSystemDefault === false && historyData && historyData.length > 0) {
 				lastPeriodKey = historyData[historyData.length - 1].period;
 			}
-			simStats = { balance: initVal, initBalance: initVal, targetBalance: targetVal, totalBets: 0, winBets: 0,
-				lastPeriod: lastPeriodKey, logs: [] };
-			localStorage.setItem('jnd28_sim_stats_v3', JSON.stringify(simStats));
+			simStats = { balance: initVal, initBalance: initVal, targetBalance: targetVal, totalBets: 0, winBets: 0, lastPeriod: lastPeriodKey, logs: [] };
+			localStorage.setItem('jnd28_sim_stats_v4', JSON.stringify(simStats));
 			updateSimulationUI();
 			renderSimHistoryUI();
 			if (historyData && historyData.length > 0) {
@@ -1329,15 +1264,11 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		}
 
 		function updateSimulationUI() {
-			let targetText = simStats.targetBalance > 0 ?
-				`<br><span style="font-size:10px;color:#888;font-weight:normal;">(目标: ￥${simStats.targetBalance.toFixed(2)})</span>` :
-				'';
+			let targetText = simStats.targetBalance > 0 ? `<br><span style="font-size:10px;color:#888;font-weight:normal;">(目标: ￥${simStats.targetBalance.toFixed(2)})</span>` : '';
 			if (simStats.targetBalance > 0 && simStats.balance >= simStats.targetBalance) {
-				document.getElementById('sim-current-balance').innerHTML =
-					`￥${simStats.balance.toFixed(2)}${targetText}<br><span style="font-size:11px;color:#00b894;font-weight:900;">🏆 目标达成</span>`;
+				document.getElementById('sim-current-balance').innerHTML = `￥${simStats.balance.toFixed(2)}${targetText}<br><span style="font-size:11px;color:#00b894;font-weight:900;">🏆 目标达成</span>`;
 			} else {
-				document.getElementById('sim-current-balance').innerHTML =
-				`￥${simStats.balance.toFixed(2)}${targetText}`;
+				document.getElementById('sim-current-balance').innerHTML = `￥${simStats.balance.toFixed(2)}${targetText}`;
 			}
 			let profitAmount = simStats.balance - simStats.initBalance;
 			let profitRate = (profitAmount / simStats.initBalance) * 100;
@@ -1370,17 +1301,13 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				let statusText = "⏳ 待开奖结算";
 				let statusColor = "#ffd700";
 				if (isTargetReached) {
-					statusText = "🎉 目标达成停注";
-					statusColor = "#00b894";
-					logComboTag = "🛑 止盈锁定";
+					statusText = "🎉 目标达成停注"; statusColor = "#00b894"; logComboTag = "🛑 止盈锁定";
 				} else if (totalBetAmount === 0) {
-					statusText = "🛑 空仓观望中";
-					statusColor = "#888";
+					statusText = "🛑 空仓观望中"; statusColor = "#888";
 				}
 				let currentBetDisplay = "￥0";
 				if (totalBetAmount > 0) {
-					currentBetDisplay =
-						`<span style="color:#aaa;">${nextPred.state1}</span> <span style="color:#ffd700; font-family:monospace;">${betPerState}</span><br><span style="color:#aaa;">${nextPred.state2}</span> <span style="color:#ffd700; font-family:monospace;">${betPerState}</span>`;
+					currentBetDisplay = `<span style="color:#aaa;">${nextPred.state1}</span> <span style="color:#ffd700; font-family:monospace;">${betPerState}</span><br><span style="color:#aaa;">${nextPred.state2}</span> <span style="color:#ffd700; font-family:monospace;">${betPerState}</span>`;
 				} else if (isTargetReached) {
 					currentBetDisplay = `<span style="color:#00b894; font-weight:bold;">已达标放假</span>`;
 				}
@@ -1394,8 +1321,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 					</tr>`;
 			}
 			if ((!simStats.logs || simStats.logs.length === 0) && htmlBuffer === "") {
-				tbody.innerHTML =
-					'<tr><td colspan="5" class="small" style="color:#555; padding:20px; text-align:center;">💡 暂无模拟投注明细流水</td></tr>';
+				tbody.innerHTML = '<tr><td colspan="5" class="small" style="color:#555; padding:20px; text-align:center;">💡 暂无模拟投注明细流水</td></tr>';
 				return;
 			}
 			const displayLogs = simStats.logs.slice().reverse();
@@ -1404,8 +1330,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				const netSign = log.netProfit > 0 ? '+' : '';
 				let logBetDisplay = `￥${log.betAmount}`;
 				if (log.state1 && log.state2 && log.bet1 !== undefined) {
-					logBetDisplay =
-						`<span style="color:#888;">${log.state1}</span> <span style="font-family:monospace;">${log.bet1}</span><br><span style="color:#888;">${log.state2}</span> <span style="font-family:monospace;">${log.bet2}</span>`;
+					logBetDisplay = `<span style="color:#888;">${log.state1}</span> <span style="font-family:monospace;">${log.bet1}</span><br><span style="color:#888;">${log.state2}</span> <span style="font-family:monospace;">${log.bet2}</span>`;
 				}
 				htmlBuffer += `
 					<tr>
@@ -1421,7 +1346,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 
 		function triggerSimulationSettle() {
 			if (historyData.length < 5) return;
-			let stored = localStorage.getItem('jnd28_sim_stats_v3');
+			let stored = localStorage.getItem('jnd28_sim_stats_v4');
 			if (stored) simStats = JSON.parse(stored);
 			if (!simStats.logs) simStats.logs = [];
 			let lastIdx = historyData.findIndex(x => x.period === simStats.lastPeriod);
@@ -1430,7 +1355,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				lastIdx = startBacktestIdx - 1;
 				if (lastIdx < -1 || startBacktestIdx >= historyData.length) {
 					simStats.lastPeriod = historyData[historyData.length - 1].period;
-					localStorage.setItem('jnd28_sim_stats_v3', JSON.stringify(simStats));
+					localStorage.setItem('jnd28_sim_stats_v4', JSON.stringify(simStats));
 					updateSimulationUI();
 					renderSimHistoryUI();
 					return;
@@ -1453,17 +1378,14 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 					let o2 = ODDS_MAP[pastPred.state2] || 4.5;
 					let isSpecialDraw = checkPairOrTriple(latest.fullFormat);
 					let logComboTag = pastPred.comboStr;
-					let payout1 = 0,
-						payout2 = 0;
+					let payout1 = 0, payout2 = 0;
 					if (latest.state === pastPred.state1) {
 						payout1 = isSpecialDraw ? betPerState : betPerState * o1;
-						if (isSpecialDraw && !logComboTag.includes("回本保护")) logComboTag +=
-							` (${pastPred.state1}回本保护)`;
+						if (isSpecialDraw && !logComboTag.includes("回本保护")) logComboTag += ` (${pastPred.state1}回本保护)`;
 					}
 					if (latest.state === pastPred.state2) {
 						payout2 = isSpecialDraw ? betPerState : betPerState * o2;
-						if (isSpecialDraw && !logComboTag.includes("回本保护") && latest.state !== pastPred
-							.state1) logComboTag += ` (${pastPred.state2}回本保护)`;
+						if (isSpecialDraw && !logComboTag.includes("回本保护") && latest.state !== pastPred.state1) logComboTag += ` (${pastPred.state2}回本保护)`;
 					}
 					let totalPayout = payout1 + payout2;
 					let isHit = (latest.state === pastPred.state1 || latest.state === pastPred.state2);
@@ -1473,32 +1395,46 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 					simStats.totalBets++;
 					if (isHit) simStats.winBets++;
 					simStats.logs.push({
-						period: latest.period,
-						combo: logComboTag,
-						state1: pastPred.state1,
-						state2: pastPred.state2,
-						bet1: betPerState,
-						bet2: betPerState,
-						betAmount: totalBetAmount,
-						netProfit: netProfit,
-						balanceAfter: simStats.balance
+						period: latest.period, combo: logComboTag, state1: pastPred.state1, state2: pastPred.state2,
+						bet1: betPerState, bet2: betPerState, betAmount: totalBetAmount, netProfit: netProfit, balanceAfter: simStats.balance
 					});
 				}
 				simStats.lastPeriod = latest.period;
 			}
 			if (simStats.logs.length > 150) { simStats.logs = simStats.logs.slice(-150); }
-			localStorage.setItem('jnd28_sim_stats_v3', JSON.stringify(simStats));
+			localStorage.setItem('jnd28_sim_stats_v4', JSON.stringify(simStats));
 			updateSimulationUI();
 			renderSimHistoryUI();
 		}
 
-		// ==================== 权重优化 ====================
+		// ==================== 优化3：按50期严格动态评估系统 ====================
+		function periodicWeightEvaluation() {
+			if (customWeights) return;
+			if (historyData.length < 50) return;
+
+			const latestStr = historyData[historyData.length - 1].period;
+			const latestNum = parseInt(String(latestStr).replace(/\D/g, ''), 10);
+			if (isNaN(latestNum)) return;
+
+			// 首次记录
+			if (!window._lastEvalPeriod) {
+				window._lastEvalPeriod = latestNum;
+				optimizeWeightsDeep50();
+				return;
+			}
+
+			// 满足50期跨度触发重新评估
+			if (Math.abs(latestNum - window._lastEvalPeriod) >= 50) {
+				window._lastEvalPeriod = latestNum;
+				console.log(`[动态评估] 期号已跨越50期，触发模型权重深层重估...`);
+				optimizeWeightsDeep50();
+			}
+		}
+
 		function optimizeWeightsDeep50() {
 			if (customWeights) return;
-			if (historyData.length < 25) return;
-			updateDynamicWeights();
-			const winSize = Math.min(55, historyData.length - 8);
-			if (winSize <= 0) return;
+			if (historyData.length < 50) return;
+			const winSize = 50; // 严格以最近50期为窗口
 			const start = historyData.length - winSize;
 			const hits = {};
 			models.forEach(m => hits[m.name] = 0);
@@ -1506,13 +1442,11 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			for (let i = start; i < historyData.length; i++) {
 				const actual = historyData[i].state;
 				const sub = historyData.slice(0, i);
-				if (sub.length < 3) continue;
+				if (sub.length < 10) continue;
 				models.forEach(m => {
 					const scores = m.func(sub);
-					let best = STATES[0],
-						maxS = -Infinity;
-					STATES.forEach(s => { if (scores[s] > maxS) { maxS = scores[s];
-							best = s; } });
+					let best = STATES[0], maxS = -Infinity;
+					STATES.forEach(s => { if (scores[s] > maxS) { maxS = scores[s]; best = s; } });
 					if (best === actual) hits[m.name]++;
 				});
 				rounds++;
@@ -1520,52 +1454,50 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			if (rounds > 0) {
 				let totalHit = Object.values(hits).reduce((a, b) => a + b, 0);
 				if (totalHit > 0) {
-					models.forEach(m => weights[m.name] = Math.max(0.02, Math.min(0.22, hits[m.name] / totalHit)));
+					// 指数级放大模型表现差异：命中率越好权重越高，表现差的直接削弱
+					models.forEach(m => {
+						let hitRate = hits[m.name] / rounds;
+						weights[m.name] = Math.max(0.01, Math.pow(hitRate, 2)); // 保留0.01底线学习能力
+					});
 					const sumW = Object.values(weights).reduce((a, b) => a + b, 0);
 					models.forEach(m => weights[m.name] /= sumW);
 				}
 			}
+			renderWeightsTable();
 		}
 
 		// ==================== 数据加载 ====================
 		async function loadData(isSilent = false) {
 			const btn = document.getElementById("refreshBtn");
 			const statusTag = document.getElementById("engine-status");
-			if (!isSilent) { btn.disabled = true;
-				btn.innerText = "⚡ 穿透跨域通道..."; }
-			let rawJson = null,
-				ok = false;
+			if (!isSilent) { btn.disabled = true; btn.innerText = "⚡ 穿透跨域通道..."; }
+			let rawJson = null, ok = false;
 			const targetUrl = "https://pc28.help/api/kj.json?nbr=300";
 			const bust = `_t=${Date.now()}&_r=${Math.random().toString(36).substr(2)}`;
 			const full = `${targetUrl}&${bust}`;
 			const fetchOptions = { signal: AbortSignal.timeout(8000) };
 			try {
 				const r = await fetch(full, fetchOptions);
-				if (r.ok) { rawJson = await r.json();
-					ok = true; }
+				if (r.ok) { rawJson = await r.json(); ok = true; }
 			} catch (e) {}
 			if (!ok) {
 				try {
 					const p = `https://api.allorigins.win/raw?url=${encodeURIComponent(full)}`;
 					const r = await fetch(p, { signal: AbortSignal.timeout(10000) });
-					if (r.ok) { const t = await r.text(); if (t && (t.trim().startsWith('[') || t.trim().startsWith(
-							'{'))) { rawJson = JSON.parse(t);
-							ok = true; } }
+					if (r.ok) { const t = await r.text(); if (t && (t.trim().startsWith('[') || t.trim().startsWith('{'))) { rawJson = JSON.parse(t); ok = true; } }
 				} catch (e) {}
 			}
 			if (!ok) {
 				try {
 					const p = `https://corsproxy.io/?${encodeURIComponent(full)}`;
 					const r = await fetch(p, { signal: AbortSignal.timeout(10000) });
-					if (r.ok) { rawJson = await r.json();
-						ok = true; }
+					if (r.ok) { rawJson = await r.json(); ok = true; }
 				} catch (e) {}
 			}
 			if (ok && rawJson && rawJson.data && Array.isArray(rawJson.data) && rawJson.data.length > 0) {
 				if (rawJson.countdown) {
 					const parts = rawJson.countdown.split(':').map(Number);
-					let sec = parts.length === 3 ? parts[0] * 3600 + parts[1] * 60 + parts[2] : (parts.length === 2 ?
-						parts[0] * 60 + parts[1] : 0);
+					let sec = parts.length === 3 ? parts[0] * 3600 + parts[1] * 60 + parts[2] : (parts.length === 2 ? parts[0] * 60 + parts[1] : 0);
 					nextDrawTime = sec > 0 ? Date.now() + sec * 1000 : null;
 				} else nextDrawTime = null;
 				const parsed = [];
@@ -1577,35 +1509,28 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 					if (item.number && typeof item.number === 'string' && item.number.includes('+')) {
 						const f = parseNumberField(item.number, comb); if (f) fmt = f;
 					}
-					if (!fmt && item.num) { const s = parseInt(item.num, 10); if (!isNaN(s)) fmt =
-							`和值=${s} ${comb || getState(s)}`; }
+					if (!fmt && item.num) { const s = parseInt(item.num, 10); if (!isNaN(s)) fmt = `和值=${s} ${comb || getState(s)}`; }
 					if (!fmt) continue;
 					let state = comb || '';
-					if (!state && item.num) { const s = parseInt(item.num, 10); if (!isNaN(s)) state = getState(
-						s); }
+					if (!state && item.num) { const s = parseInt(item.num, 10); if (!isNaN(s)) state = getState(s); }
 					if (!state) state = '未知';
 					parsed.push({ period, state, fullFormat: fmt, pureFormula: fmt });
 				}
 				if (parsed.length) {
-					parsed.sort((a, b) => (parseInt(String(a.period).replace(/\D/g, ''), 10) || 0) - (parseInt(String(b
-						.period).replace(/\D/g, ''), 10) || 0));
+					parsed.sort((a, b) => (parseInt(String(a.period).replace(/\D/g, ''), 10) || 0) - (parseInt(String(b.period).replace(/\D/g, ''), 10) || 0));
 					historyData = parsed;
 					lastFetchTimestamp = Date.now();
-					statusTag.innerHTML =
-						`<span class="engine-type" style="background:#00b894; color:#fff;">📡 实时同步成功 v3.0 (深度300期)</span>`;
+					statusTag.innerHTML = `<span class="engine-type" style="background:#00b894; color:#fff;">📡 实时同步成功 v4.0 (深度300期)</span>`;
 				} else if (!historyData.length) {
 					historyData = getFallbackMock();
-					statusTag.innerHTML =
-					`<span class="engine-type" style="background:#ff4757;">🤖 离线沙盒模式</span>`;
+					statusTag.innerHTML = `<span class="engine-type" style="background:#ff4757;">🤖 离线沙盒模式</span>`;
 				}
 			} else {
 				if ((Date.now() - lastFetchTimestamp) > 600000 && !historyData.length) {
 					historyData = getFallbackMock();
-					statusTag.innerHTML =
-						`<span class="engine-type" style="background:#ff4757;">🤖 离线沙盒模式</span>`;
+					statusTag.innerHTML = `<span class="engine-type" style="background:#ff4757;">🤖 离线沙盒模式</span>`;
 				} else if (!ok && historyData.length) {
-					statusTag.innerHTML =
-						`<span class="engine-type" style="background:#ffaa00;">⚠️ 使用高速缓存</span>`;
+					statusTag.innerHTML = `<span class="engine-type" style="background:#ffaa00;">⚠️ 使用高速缓存</span>`;
 				}
 			}
 			const curPeriod = historyData.length ? historyData[historyData.length - 1].period : "";
@@ -1615,15 +1540,14 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				isInitialLoad = false;
 				await trainModelsAsync(historyData);
 				runAdversarialSelfTraining();
-				updateDynamicWeights();
 				triggerSimulationSettle();
-				optimizeWeightsDeep50();
+				// 替换原本每期都跑的更新，改为基于50期的严格周期检查
+				periodicWeightEvaluation(); 
 			}
 			updateTopDashboard();
 			renderWeightsTable();
 			await runCoreAIEngine();
-			if (!isSilent) { btn.disabled = false;
-				btn.innerText = "🔄 强制穿透同步最新数据"; }
+			if (!isSilent) { btn.disabled = false; btn.innerText = "🔄 强制穿透同步最新数据"; }
 		}
 
 		function parseNumberField(numberStr, combination) {
@@ -1639,15 +1563,11 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			const basePeriod = Math.floor(Date.now() / 210000) + 1200000;
 			let list = [];
 			let seed = basePeriod;
-
 			function seededRandom() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
 			for (let i = 0; i < 300; i++) {
-				let n1 = Math.floor(seededRandom() * 10),
-					n2 = Math.floor(seededRandom() * 10),
-					n3 = Math.floor(seededRandom() * 10);
+				let n1 = Math.floor(seededRandom() * 10), n2 = Math.floor(seededRandom() * 10), n3 = Math.floor(seededRandom() * 10);
 				let sum = n1 + n2 + n3;
-				list.push({ period: (basePeriod - i).toString(), state: getState(sum), fullFormat: `${n1}+${n2}+${n3}=${sum} ${getState(sum)}`,
-					pureFormula: `${n1}+${n2}+${n3}=${sum}` });
+				list.push({ period: (basePeriod - i).toString(), state: getState(sum), fullFormat: `${n1}+${n2}+${n3}=${sum} ${getState(sum)}`, pureFormula: `${n1}+${n2}+${n3}=${sum}` });
 			}
 			return list.reverse();
 		}
@@ -1665,19 +1585,16 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			const maxRetries = 20;
 			const statusTag = document.getElementById("engine-status");
 			if (statusTag) {
-				statusTag.innerHTML =
-					`<span class="engine-type" style="background:#ffd700; color:#000;">⏳ 开奖延迟中，正在全自动隐藏式高速追踪同步...</span>`;
+				statusTag.innerHTML = `<span class="engine-type" style="background:#ffd700; color:#000;">⏳ 开奖延迟中，正在全自动隐藏式高速追踪同步...</span>`;
 			}
 			poll();
-
 			async function poll() {
 				if (!isPollingNewPeriod) return;
 				let oldPeriod = historyData.length ? historyData[historyData.length - 1].period : "";
 				await loadData(true);
 				let newPeriod = historyData.length ? historyData[historyData.length - 1].period : "";
 				if (newPeriod !== oldPeriod || retryCount >= maxRetries) {
-					isPollingNewPeriod = false;
-					return;
+					isPollingNewPeriod = false; return;
 				}
 				retryCount++;
 				pollingTimer = setTimeout(poll, 3000);
@@ -1687,14 +1604,12 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		function initCountdown() {
 			setInterval(() => {
 				if (isPollingNewPeriod) {
-					document.getElementById("countdown-val").innerText = `同步中...`;
-					return;
+					document.getElementById("countdown-val").innerText = `同步中...`; return;
 				}
 				let remaining;
 				if (nextDrawTime) {
 					remaining = Math.max(0, Math.floor((nextDrawTime - Date.now()) / 1000));
-					if (remaining <= 0) { nextDrawTime = null;
-						startDataPolling(); return; }
+					if (remaining <= 0) { nextDrawTime = null; startDataPolling(); return; }
 				} else {
 					remaining = 210 - (Math.floor(Date.now() / 1000) % 210);
 					if (remaining <= 0 || remaining === 210) { startDataPolling(); return; }
@@ -1715,50 +1630,41 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		function initReveal(fullFormat) {
 			const parts = fullFormat.split(' ');
 			const nums = parts[0].split('=')[0].split('+').map(Number);
-			revealState = { full: fullFormat, nums, sum: nums.reduce((a, b) => a + b, 0), combination: parts.slice(1).join(
-					' '), step: 0 };
+			revealState = { full: fullFormat, nums, sum: nums.reduce((a, b) => a + b, 0), combination: parts.slice(1).join(' '), step: 0 };
 			document.getElementById('top-result-display').innerText = '?+?+?=?? ??';
 			document.getElementById('reveal-btn').style.display = 'inline-block';
 			document.getElementById('open-all-btn').style.display = 'inline-block';
 		}
 
 		function revealOne() {
-			if (revealState.step >= 4) { revealState.step = 0;
-				updateRevealDisplay(); return; }
-			revealState.step++;
-			updateRevealDisplay();
+			if (revealState.step >= 4) { revealState.step = 0; updateRevealDisplay(); return; }
+			revealState.step++; updateRevealDisplay();
 		}
 
-		function revealAll() { revealState.step = 4;
-			updateRevealDisplay(); }
+		function revealAll() { revealState.step = 4; updateRevealDisplay(); }
 
 		function updateRevealDisplay() {
 			const { step, nums, sum, combination } = revealState;
 			let display = step === 0 ? '?+?+?=?? ??' :
 				`${nums.map((n, i) => i < Math.min(step, 3) ? n : '?').join('+')}=${step >= 4 ? sum : '??'} ${step >= 4 ? combination : '??'}`;
 			const el = document.getElementById('top-result-display');
-			if (el) { el.innerText = display;
-				el.style.transform = 'scale(1.1)';
-				setTimeout(() => el.style.transform = 'scale(1)', 150); }
+			if (el) { el.innerText = display; el.style.transform = 'scale(1.1)'; setTimeout(() => el.style.transform = 'scale(1)', 150); }
 		}
 
 		function updateTopDashboard() {
 			if (!historyData.length) return;
 			const latest = historyData[historyData.length - 1];
 			document.getElementById("top-period").innerText = latest.period;
-			if (latest.period !== lastRevealPeriod) { lastRevealPeriod = latest.period;
-				initReveal(latest.fullFormat); }
+			if (latest.period !== lastRevealPeriod) { lastRevealPeriod = latest.period; initReveal(latest.fullFormat); }
 			try {
 				const num = String(latest.period).replace(/\D/g, '');
-				document.getElementById("next-period").innerText = (num && /^\d+$/.test(num)) ? (BigInt(num) + 1n)
-					.toString() : '待同步';
+				document.getElementById("next-period").innerText = (num && /^\d+$/.test(num)) ? (BigInt(num) + 1n).toString() : '待同步';
 			} catch (e) { document.getElementById("next-period").innerText = '同步中'; }
 		}
 
 		async function runCoreAIEngine() {
 			if (historyData.length < 3) {
-				document.getElementById("history-tbody").innerHTML =
-					'<tr><td colspan="4" class="small">⏳ 全算法模块载入中...</td></tr>';
+				document.getElementById("history-tbody").innerHTML = '<tr><td colspan="4" class="small">⏳ 全算法模块载入中...</td></tr>';
 				document.getElementById("next-combo").innerText = "等待数据";
 				document.getElementById("next-score").innerText = "--";
 				document.getElementById("accuracy-display").innerText = "命中率 --";
@@ -1769,8 +1675,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			document.getElementById("next-score").innerText = nextPred.topScore;
 			const show = Math.min(50, historyData.length);
 			const start = historyData.length - show;
-			let totalHits = 0,
-				predCount = 0;
+			let totalHits = 0, predCount = 0;
 			let htmlBuffer = "";
 			for (let i = start; i < historyData.length; i++) {
 				const cur = historyData[i];
@@ -1779,8 +1684,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				const isHit = pastPred.topList.includes(cur.state);
 				if (isHit) totalHits++;
 				predCount++;
-				htmlBuffer +=
-					`<tr><td>${cur.period}</td><td style="text-align:left;padding-left:14px;font-weight:600;">${cur.fullFormat}</td><td><span class="combo-badge">${pastPred.comboStr}</span></td><td>${isHit ? '<span class="hit-badge">√</span>' : '<span class="miss-badge">×</span>'}</td></tr>`;
+				htmlBuffer += `<tr><td>${cur.period}</td><td style="text-align:left;padding-left:14px;font-weight:600;">${cur.fullFormat}</td><td><span class="combo-badge">${pastPred.comboStr}</span></td><td>${isHit ? '<span class="hit-badge">√</span>' : '<span class="miss-badge">×</span>'}</td></tr>`;
 			}
 			document.getElementById("history-tbody").innerHTML = htmlBuffer;
 			const accuracy = predCount ? ((totalHits / predCount) * 100).toFixed(1) : 0;
@@ -1822,8 +1726,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		function resetToAutoWeights() {
 			customWeights = null;
 			modelRecentPerformance = {};
-			dynamicWeightBoost = {};
-			updateDynamicWeights();
+			window._lastEvalPeriod = null; // 重置周期计数
 			optimizeWeightsDeep50();
 			renderWeightsTable();
 			runCoreAIEngine();
