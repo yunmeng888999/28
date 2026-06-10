@@ -1231,15 +1231,46 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			}
 		}
 
+		const SIM_STORAGE_KEY = 'jnd28_sim_stats_v4';
+
+		function normalizeSimulationStats() {
+			if (!simStats || typeof simStats !== 'object') simStats = {};
+			const n = (v, d) => {
+				const x = parseFloat(v);
+				return Number.isFinite(x) ? x : d;
+			};
+			simStats.balance = n(simStats.balance, 500);
+			simStats.initBalance = n(simStats.initBalance, 500);
+			if (simStats.initBalance <= 0) simStats.initBalance = 500;
+			simStats.targetBalance = n(simStats.targetBalance, 1000);
+			simStats.totalBets = parseInt(simStats.totalBets || 0, 10) || 0;
+			simStats.winBets = parseInt(simStats.winBets || 0, 10) || 0;
+			simStats.lastPeriod = simStats.lastPeriod ? String(simStats.lastPeriod) : '';
+			if (!Array.isArray(simStats.logs)) simStats.logs = [];
+			if (!simStats.pendingBet || typeof simStats.pendingBet !== 'object' || !simStats.pendingBet.period) {
+				simStats.pendingBet = null;
+			}
+			return simStats;
+		}
+
+		function saveSimulationStats() {
+			normalizeSimulationStats();
+			localStorage.setItem(SIM_STORAGE_KEY, JSON.stringify(simStats));
+		}
+
 		function loadSimulationStats() {
-			let stored = localStorage.getItem('jnd28_sim_stats_v4');
+			let stored = localStorage.getItem(SIM_STORAGE_KEY);
 			if (stored) {
-				simStats = JSON.parse(stored);
-				if (!simStats.logs) simStats.logs = [];
-				document.getElementById('sim-init-balance').value = simStats.initBalance;
-				if (simStats.targetBalance !== undefined) {
-					document.getElementById('sim-target-balance').value = simStats.targetBalance;
+				try {
+					simStats = JSON.parse(stored);
+				} catch (e) {
+					console.warn('模拟账户缓存损坏，已重建:', e);
+					simStats = { balance: 500, initBalance: 500, targetBalance: 1000, totalBets: 0, winBets: 0, lastPeriod: '', logs: [], pendingBet: null };
 				}
+				normalizeSimulationStats();
+				document.getElementById('sim-init-balance').value = simStats.initBalance;
+				document.getElementById('sim-target-balance').value = simStats.targetBalance;
+				saveSimulationStats();
 			} else {
 				initSimulation(true);
 			}
@@ -1250,20 +1281,31 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		function initSimulation(isSystemDefault = false) {
 			let initVal = parseFloat(document.getElementById('sim-init-balance').value) || 500;
 			let targetVal = parseFloat(document.getElementById('sim-target-balance').value) || 1000;
-			let lastPeriodKey = "";
-			if (isSystemDefault === false && historyData && historyData.length > 0) {
+			let lastPeriodKey = '';
+			if (historyData && historyData.length > 0) {
 				lastPeriodKey = historyData[historyData.length - 1].period;
 			}
-			simStats = { balance: initVal, initBalance: initVal, targetBalance: targetVal, totalBets: 0, winBets: 0, lastPeriod: lastPeriodKey, logs: [] };
-			localStorage.setItem('jnd28_sim_stats_v4', JSON.stringify(simStats));
+			simStats = {
+				balance: initVal,
+				initBalance: initVal,
+				targetBalance: targetVal,
+				totalBets: 0,
+				winBets: 0,
+				lastPeriod: lastPeriodKey,
+				logs: [],
+				pendingBet: null
+			};
+			saveSimulationStats();
+			if (historyData && historyData.length > 0) {
+				ensurePendingBetForNextPeriod();
+				saveSimulationStats();
+			}
 			updateSimulationUI();
 			renderSimHistoryUI();
-			if (historyData && historyData.length > 0) {
-				triggerSimulationSettle();
-			}
 		}
 
 		function updateSimulationUI() {
+			normalizeSimulationStats();
 			let targetText = simStats.targetBalance > 0 ? `<br><span style="font-size:10px;color:#888;font-weight:normal;">(目标: ￥${simStats.targetBalance.toFixed(2)})</span>` : '';
 			if (simStats.targetBalance > 0 && simStats.balance >= simStats.targetBalance) {
 				document.getElementById('sim-current-balance').innerHTML = `￥${simStats.balance.toFixed(2)}${targetText}<br><span style="font-size:11px;color:#00b894;font-weight:900;">🏆 目标达成</span>`;
@@ -1271,7 +1313,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				document.getElementById('sim-current-balance').innerHTML = `￥${simStats.balance.toFixed(2)}${targetText}`;
 			}
 			let profitAmount = simStats.balance - simStats.initBalance;
-			let profitRate = (profitAmount / simStats.initBalance) * 100;
+			let profitRate = simStats.initBalance > 0 ? (profitAmount / simStats.initBalance) * 100 : 0;
 			let rateEl = document.getElementById('sim-return-rate');
 			let sign = profitAmount >= 0 ? '+' : '';
 			rateEl.innerHTML = `￥${sign}${profitAmount.toFixed(2)}<br>(${sign}${profitRate.toFixed(2)}%)`;
@@ -1279,48 +1321,191 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			document.getElementById('sim-win-stats').innerText = `${simStats.winBets} / ${simStats.totalBets}`;
 		}
 
+		function getNextPeriodStr() {
+			if (!historyData || historyData.length === 0) return '待同步';
+			let current = String(historyData[historyData.length - 1].period || '');
+			try {
+				let num = current.replace(/\D/g, '');
+				if (num && /^\d+$/.test(num)) return (BigInt(num) + 1n).toString();
+			} catch (e) {}
+			return '下一期';
+		}
+
+		function findHistoryByPeriod(period) {
+			if (!period || !historyData || !historyData.length) return null;
+			return historyData.find(x => String(x.period) === String(period)) || null;
+		}
+
+		function isPeriodExpired(period) {
+			if (!period || !historyData || !historyData.length) return false;
+			try {
+				const target = BigInt(String(period).replace(/\D/g, ''));
+				const latest = BigInt(String(historyData[historyData.length - 1].period).replace(/\D/g, ''));
+				return target <= latest;
+			} catch (e) {
+				return false;
+			}
+		}
+
+		function ensurePendingBetForNextPeriod() {
+			normalizeSimulationStats();
+			if (!historyData || historyData.length < 3) return null;
+
+			// 如果已有锁单，且还没开奖，绝不重新计算，直接复用。
+			if (simStats.pendingBet) {
+				const actual = findHistoryByPeriod(simStats.pendingBet.period);
+				if (actual) {
+					settlePendingBetWithActual(actual);
+				} else if (!isPeriodExpired(simStats.pendingBet.period)) {
+					return simStats.pendingBet;
+				} else {
+					// 数据源已经跳过该期，无法公平结算，清除过期锁单，防止界面卡死。
+					console.warn('模拟投注锁单已过期但未找到开奖结果，已清除:', simStats.pendingBet.period);
+					simStats.pendingBet = null;
+				}
+			}
+
+			const nextPeriodStr = getNextPeriodStr();
+			const isTargetReached = simStats.targetBalance > 0 && simStats.balance >= simStats.targetBalance;
+
+			if (isTargetReached) {
+				simStats.pendingBet = {
+					period: nextPeriodStr,
+					combo: '🛑 止盈锁定',
+					state1: '',
+					state2: '',
+					bet1: 0,
+					bet2: 0,
+					betAmount: 0,
+					bestF: 0,
+					confidence: 0,
+					status: 'target_reached',
+					lockedAt: Date.now(),
+					balanceBase: simStats.balance
+				};
+				return simStats.pendingBet;
+			}
+
+			const nextPred = getComboPredictionRaw(historyData, false);
+			let betPerState = 0;
+			let totalBetAmount = 0;
+			let status = 'watch';
+			if (nextPred.bestF > 0 && !nextPred.isAdvBlock && nextPred.confidence >= 0.3) {
+				betPerState = Math.floor(simStats.balance * nextPred.bestF * 0.5);
+				if (betPerState >= 1) {
+					totalBetAmount = betPerState * 2;
+					status = 'locked';
+				}
+			}
+
+			simStats.pendingBet = {
+				period: nextPeriodStr,
+				combo: nextPred.comboStr,
+				state1: nextPred.state1,
+				state2: nextPred.state2,
+				bet1: betPerState,
+				bet2: betPerState,
+				betAmount: totalBetAmount,
+				bestF: nextPred.bestF || 0,
+				confidence: nextPred.confidence || 0,
+				isAdvBlock: !!nextPred.isAdvBlock,
+				status,
+				lockedAt: Date.now(),
+				balanceBase: simStats.balance,
+				odds1: ODDS_MAP[nextPred.state1] || 4.5,
+				odds2: ODDS_MAP[nextPred.state2] || 4.5
+			};
+			return simStats.pendingBet;
+		}
+
+		function settlePendingBetWithActual(actualItem) {
+			normalizeSimulationStats();
+			const bet = simStats.pendingBet;
+			if (!bet || !actualItem || String(bet.period) !== String(actualItem.period)) return false;
+
+			if (bet.status === 'locked' && bet.betAmount > 0) {
+				let logComboTag = bet.combo || `${bet.state1}/${bet.state2}`;
+				const isSpecialDraw = checkPairOrTriple(actualItem.fullFormat);
+				let payout1 = 0, payout2 = 0;
+				if (actualItem.state === bet.state1) {
+					payout1 = isSpecialDraw ? bet.bet1 : bet.bet1 * (bet.odds1 || ODDS_MAP[bet.state1] || 4.5);
+					if (isSpecialDraw && !logComboTag.includes('回本保护')) logComboTag += ` (${bet.state1}回本保护)`;
+				}
+				if (actualItem.state === bet.state2) {
+					payout2 = isSpecialDraw ? bet.bet2 : bet.bet2 * (bet.odds2 || ODDS_MAP[bet.state2] || 4.5);
+					if (isSpecialDraw && !logComboTag.includes('回本保护') && actualItem.state !== bet.state1) logComboTag += ` (${bet.state2}回本保护)`;
+				}
+				const totalPayout = payout1 + payout2;
+				const isHit = (actualItem.state === bet.state1 || actualItem.state === bet.state2);
+				let netProfit = totalPayout - bet.betAmount;
+				if (Math.abs(netProfit) < 0.0001) netProfit = 0;
+				simStats.balance = simStats.balance + netProfit;
+				simStats.totalBets++;
+				if (isHit) simStats.winBets++;
+				simStats.logs.push({
+					period: actualItem.period,
+					combo: logComboTag,
+					state1: bet.state1,
+					state2: bet.state2,
+					bet1: bet.bet1,
+					bet2: bet.bet2,
+					betAmount: bet.betAmount,
+					netProfit,
+					balanceAfter: simStats.balance,
+					lockedAt: bet.lockedAt,
+					settledAt: Date.now(),
+					actual: actualItem.fullFormat || actualItem.state
+				});
+			}
+
+			simStats.lastPeriod = actualItem.period;
+			simStats.pendingBet = null;
+			return true;
+		}
+
+		function formatLockTime(ts) {
+			if (!ts) return '';
+			try {
+				return new Date(ts).toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+			} catch (e) { return ''; }
+		}
+
 		function renderSimHistoryUI() {
 			const tbody = document.getElementById('sim-history-tbody');
 			if (!tbody) return;
-			let htmlBuffer = "";
-			if (historyData && historyData.length > 0) {
-				let nextPeriodStr = "待同步";
-				try {
-					let num = String(historyData[historyData.length - 1].period).replace(/\D/g, '');
-					if (num && /^\d+$/.test(num)) { nextPeriodStr = (BigInt(num) + 1n).toString(); }
-				} catch (e) {}
-				let nextPred = getComboPredictionRaw(historyData, false);
-				let totalBetAmount = 0;
-				let betPerState = 0;
-				let isTargetReached = simStats.targetBalance > 0 && simStats.balance >= simStats.targetBalance;
-				if (nextPred.bestF > 0 && !nextPred.isAdvBlock && !isTargetReached) {
-					betPerState = Math.floor(simStats.balance * nextPred.bestF * 0.5);
-					if (betPerState >= 1) { totalBetAmount = betPerState * 2; }
-				}
-				let logComboTag = nextPred.comboStr;
-				let statusText = "⏳ 待开奖结算";
-				let statusColor = "#ffd700";
-				if (isTargetReached) {
-					statusText = "🎉 目标达成停注"; statusColor = "#00b894"; logComboTag = "🛑 止盈锁定";
-				} else if (totalBetAmount === 0) {
-					statusText = "🛑 空仓观望中"; statusColor = "#888";
-				}
-				let currentBetDisplay = "￥0";
-				if (totalBetAmount > 0) {
-					currentBetDisplay = `<span style="color:#aaa;">${nextPred.state1}</span> <span style="color:#ffd700; font-family:monospace;">${betPerState}</span><br><span style="color:#aaa;">${nextPred.state2}</span> <span style="color:#ffd700; font-family:monospace;">${betPerState}</span>`;
-				} else if (isTargetReached) {
+			normalizeSimulationStats();
+			let htmlBuffer = '';
+
+			if (simStats.pendingBet) {
+				const bet = simStats.pendingBet;
+				let statusText = '⏳ 已锁单，待开奖结算';
+				let statusColor = '#ffd700';
+				let logComboTag = bet.combo || '--';
+				let currentBetDisplay = '￥0';
+				if (bet.status === 'locked' && bet.betAmount > 0) {
+					currentBetDisplay = `<span style="color:#aaa;">${bet.state1}</span> <span style="color:#ffd700; font-family:monospace;">${bet.bet1}</span><br><span style="color:#aaa;">${bet.state2}</span> <span style="color:#ffd700; font-family:monospace;">${bet.bet2}</span>`;
+				} else if (bet.status === 'target_reached') {
+					statusText = '🎉 目标达成停注';
+					statusColor = '#00b894';
 					currentBetDisplay = `<span style="color:#00b894; font-weight:bold;">已达标放假</span>`;
+				} else {
+					statusText = '🛑 空仓观望中';
+					statusColor = '#888';
 				}
+				const lockedText = bet.lockedAt ? `<br><span style="font-size:9px; color:#777; font-weight:normal;">锁单 ${formatLockTime(bet.lockedAt)}</span>` : '';
 				htmlBuffer += `
 					<tr style="background: rgba(0, 240, 255, 0.08); border-left: 3px solid var(--glow-blue);">
-						<td style="padding: 10px 4px; color: var(--glow-blue); font-weight: bold;">${nextPeriodStr} <span style="font-size:9px; font-weight:normal; opacity:0.7;">(当前期)</span></td>
+						<td style="padding: 10px 4px; color: var(--glow-blue); font-weight: bold;">${bet.period} <span style="font-size:9px; font-weight:normal; opacity:0.7;">(当前锁单)</span>${lockedText}</td>
 						<td style="padding: 10px 4px;"><span class="combo-badge" style="font-size:10px; padding:2px 6px; border-color: var(--glow-blue); color: var(--glow-blue); background: rgba(0,240,255,0.02);">${logComboTag}</span></td>
 						<td style="padding: 10px 4px; font-weight:bold; line-height:1.4; text-align:left; padding-left:14px;">${currentBetDisplay}</td>
 						<td style="padding: 10px 4px; color:${statusColor}; font-weight:bold;">${statusText}</td>
 						<td style="padding: 10px 4px; color:#aaa; font-family:'Courier New',monospace;">--</td>
 					</tr>`;
+			} else if (historyData && historyData.length > 0) {
+				htmlBuffer += `<tr style="background: rgba(255, 215, 0, 0.06);"><td colspan="5" class="small" style="color:#ffd700; padding:12px; text-align:center;">⏳ 等待系统生成下一期锁单</td></tr>`;
 			}
-			if ((!simStats.logs || simStats.logs.length === 0) && htmlBuffer === "") {
+
+			if ((!simStats.logs || simStats.logs.length === 0) && htmlBuffer === '') {
 				tbody.innerHTML = '<tr><td colspan="5" class="small" style="color:#555; padding:20px; text-align:center;">💡 暂无模拟投注明细流水</td></tr>';
 				return;
 			}
@@ -1345,64 +1530,28 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		}
 
 		function triggerSimulationSettle() {
-			if (historyData.length < 5) return;
-			let stored = localStorage.getItem('jnd28_sim_stats_v4');
-			if (stored) simStats = JSON.parse(stored);
-			if (!simStats.logs) simStats.logs = [];
-			let lastIdx = historyData.findIndex(x => x.period === simStats.lastPeriod);
-			if (lastIdx === -1) {
-				let startBacktestIdx = Math.max(0, historyData.length - 50);
-				lastIdx = startBacktestIdx - 1;
-				if (lastIdx < -1 || startBacktestIdx >= historyData.length) {
-					simStats.lastPeriod = historyData[historyData.length - 1].period;
-					localStorage.setItem('jnd28_sim_stats_v4', JSON.stringify(simStats));
-					updateSimulationUI();
-					renderSimHistoryUI();
-					return;
+			if (!historyData || historyData.length < 5) return;
+			let stored = localStorage.getItem(SIM_STORAGE_KEY);
+			if (stored) {
+				try { simStats = JSON.parse(stored); } catch (e) {}
+			}
+			normalizeSimulationStats();
+
+			// 只结算“之前已经锁定”的投注，不再根据历史数据临时回算下注，避免明细实时漂移。
+			if (simStats.pendingBet) {
+				const actual = findHistoryByPeriod(simStats.pendingBet.period);
+				if (actual) {
+					settlePendingBetWithActual(actual);
+				} else if (isPeriodExpired(simStats.pendingBet.period)) {
+					console.warn('模拟投注锁单期号已过期但数据源未返回该期，已跳过:', simStats.pendingBet.period);
+					simStats.pendingBet = null;
 				}
 			}
-			for (let i = lastIdx + 1; i < historyData.length; i++) {
-				let latest = historyData[i];
-				let pastContext = historyData.slice(0, i);
-				let pastPred = getComboPredictionRaw(pastContext, false);
-				if (simStats.targetBalance > 0 && simStats.balance >= simStats.targetBalance) {
-					simStats.lastPeriod = latest.period;
-					continue;
-				}
-				if (pastPred.bestF > 0 && !pastPred.isAdvBlock && pastPred.confidence >= 0.3) {
-					let f = pastPred.bestF;
-					let betPerState = Math.floor(simStats.balance * f * 0.5);
-					if (betPerState < 1) continue;
-					let totalBetAmount = betPerState * 2;
-					let o1 = ODDS_MAP[pastPred.state1] || 4.5;
-					let o2 = ODDS_MAP[pastPred.state2] || 4.5;
-					let isSpecialDraw = checkPairOrTriple(latest.fullFormat);
-					let logComboTag = pastPred.comboStr;
-					let payout1 = 0, payout2 = 0;
-					if (latest.state === pastPred.state1) {
-						payout1 = isSpecialDraw ? betPerState : betPerState * o1;
-						if (isSpecialDraw && !logComboTag.includes("回本保护")) logComboTag += ` (${pastPred.state1}回本保护)`;
-					}
-					if (latest.state === pastPred.state2) {
-						payout2 = isSpecialDraw ? betPerState : betPerState * o2;
-						if (isSpecialDraw && !logComboTag.includes("回本保护") && latest.state !== pastPred.state1) logComboTag += ` (${pastPred.state2}回本保护)`;
-					}
-					let totalPayout = payout1 + payout2;
-					let isHit = (latest.state === pastPred.state1 || latest.state === pastPred.state2);
-					let netProfit = totalPayout - totalBetAmount;
-					if (Math.abs(netProfit) < 0.0001) netProfit = 0;
-					simStats.balance = simStats.balance + netProfit;
-					simStats.totalBets++;
-					if (isHit) simStats.winBets++;
-					simStats.logs.push({
-						period: latest.period, combo: logComboTag, state1: pastPred.state1, state2: pastPred.state2,
-						bet1: betPerState, bet2: betPerState, betAmount: totalBetAmount, netProfit: netProfit, balanceAfter: simStats.balance
-					});
-				}
-				simStats.lastPeriod = latest.period;
-			}
-			if (simStats.logs.length > 150) { simStats.logs = simStats.logs.slice(-150); }
-			localStorage.setItem('jnd28_sim_stats_v4', JSON.stringify(simStats));
+
+			simStats.lastPeriod = historyData[historyData.length - 1].period;
+			ensurePendingBetForNextPeriod();
+			if (simStats.logs.length > 150) simStats.logs = simStats.logs.slice(-150);
+			saveSimulationStats();
 			updateSimulationUI();
 			renderSimHistoryUI();
 		}
