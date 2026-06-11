@@ -450,8 +450,8 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 					<div class="value" id="sim-return-rate" style="font-size:12px; color:#00b894; line-height:1.2; font-weight:900;">￥0.00<br>(0.00%)</div>
 				</div>
 				<div class="top-block" style="min-height:75px; padding:10px 4px; background:#000;">
-					<div class="label" style="font-size:9px; margin-bottom: 4px;">🎯 战绩(胜/总)</div>
-					<div class="value" id="sim-win-stats" style="font-size:14px; color:#ffd700;">0 / 0</div>
+					<div class="label" style="font-size:9px; margin-bottom: 4px;">🎯 战绩/命中率</div>
+					<div class="value" id="sim-win-stats" style="font-size:14px; color:#ffd700; line-height:1.25;">0 / 0<br><span style="font-size:10px;color:#888;font-weight:normal;">命中率 0.0%</span></div>
 				</div>
 			</div>
 			<button id="toggle-sim-history-btn" class="btn-sm" onclick="toggleSimHistory()" style="margin-top: 14px; margin-bottom: 0; background: #151515; color: var(--glow-blue); border: 1px solid var(--glow-blue); box-shadow: inset 0 0 5px rgba(0,240,255,0.2); width:100%;">👁️ 显示量化投注明细 (点此展开/隐藏)</button>
@@ -1232,6 +1232,11 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		}
 
 		const SIM_STORAGE_KEY = 'jnd28_sim_stats_v4';
+		const SIM_STRATEGY_VERSION = 'aggressive_stable_independent_v4_drawdown20_10base_loss5_next4';
+
+		function clampNum(v, min, max) {
+			return Math.max(min, Math.min(max, v));
+		}
 
 		function normalizeSimulationStats() {
 			if (!simStats || typeof simStats !== 'object') simStats = {};
@@ -1247,8 +1252,45 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			simStats.winBets = parseInt(simStats.winBets || 0, 10) || 0;
 			simStats.lastPeriod = simStats.lastPeriod ? String(simStats.lastPeriod) : '';
 			if (!Array.isArray(simStats.logs)) simStats.logs = [];
+			simStats.winStreak = parseInt(simStats.winStreak || 0, 10) || 0;
+			simStats.lossStreak = parseInt(simStats.lossStreak || 0, 10) || 0;
+			simStats.pauseRounds = Math.max(0, parseInt(simStats.pauseRounds || 0, 10) || 0);
+			simStats.peakBalance = n(simStats.peakBalance, Math.max(simStats.initBalance, simStats.balance));
+			if (simStats.peakBalance < simStats.balance) simStats.peakBalance = simStats.balance;
+			simStats.lastDrawdownPausePeak = n(simStats.lastDrawdownPausePeak, 0);
+			simStats.strategyVersion = simStats.strategyVersion || SIM_STRATEGY_VERSION;
 			if (!simStats.pendingBet || typeof simStats.pendingBet !== 'object' || !simStats.pendingBet.period) {
 				simStats.pendingBet = null;
+			} else {
+				// 已锁定的模拟单必须原样保留，避免刷新、训练或策略调整导致待结算记录漂移。
+			}
+			simStats.pauseMode = simStats.pauseMode ? String(simStats.pauseMode) : '';
+			simStats.pauseTotalRounds = Math.max(0, parseInt(simStats.pauseTotalRounds || 0, 10) || 0);
+			simStats.pauseUsedRounds = Math.max(0, parseInt(simStats.pauseUsedRounds || 0, 10) || 0);
+			simStats.pauseStartAfterPeriod = simStats.pauseStartAfterPeriod ? String(simStats.pauseStartAfterPeriod) : '';
+			const cleanReasonText = (txt) => String(txt || '')
+				.replace(/ · 连赢\d+期，解除旧回撤保护/g, '')
+				.replace(/连赢\d+期，解除旧回撤保护 · /g, '')
+				.replace(/连赢\d+期，解除旧回撤保护/g, '')
+				.replace(/ ·  · /g, ' · ')
+				.replace(/^ · | · $/g, '')
+				.trim();
+			if (simStats.pendingBet && simStats.pendingBet.reason) simStats.pendingBet.reason = cleanReasonText(simStats.pendingBet.reason);
+			simStats.logs.forEach(log => { if (log && log.reason) log.reason = cleanReasonText(log.reason); });
+			// 新规则：回撤保护只降仓，不再触发停注；停注只允许由连亏5期触发。
+			// 因此清理旧版本遗留的 drawdown30/risk 风控暂停状态，避免打开新版后继续“才亏1期就暂停”。
+			if (simStats.pauseRounds > 0 && simStats.pauseMode !== 'loss5') {
+				simStats.pauseRounds = 0;
+				simStats.pauseMode = '';
+				simStats.pauseTotalRounds = 0;
+				simStats.pauseUsedRounds = 0;
+				simStats.pauseStartAfterPeriod = '';
+			}
+			if (simStats.pauseRounds <= 0 && simStats.pauseMode === 'loss5') {
+				simStats.pauseMode = '';
+				simStats.pauseTotalRounds = 0;
+				simStats.pauseUsedRounds = 0;
+				simStats.pauseStartAfterPeriod = '';
 			}
 			return simStats;
 		}
@@ -1256,6 +1298,141 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		function saveSimulationStats() {
 			normalizeSimulationStats();
 			localStorage.setItem(SIM_STORAGE_KEY, JSON.stringify(simStats));
+		}
+
+		function getAggressiveStableProfile() {
+			normalizeSimulationStats();
+			const targetProfit = simStats.targetBalance - simStats.initBalance;
+			const isBalancedCapital = simStats.initBalance >= 1000 || (targetProfit > 0 && targetProfit <= simStats.initBalance * 0.8);
+			return {
+				mode: 'aggressive_stable_upper_limit',
+				minConfidence: 0.30,
+				defenseRatio: 0.04,
+				attackRatio: 0.16,
+				pushRatio: 0.12,
+				steadyRatio: 0.08,
+				finalRatio: 0.04,
+				maxTotalRatio: 0.18,
+				win2Multiplier: 1.15,
+				win3Multiplier: isBalancedCapital ? 1.25 : 1.30,
+				win4Multiplier: isBalancedCapital ? 1.35 : 1.45,
+				// 连亏 1-2 期不降仓；从连亏 3 期开始降仓。
+				loss3Multiplier: 0.70,
+				loss4Multiplier: 0.45,
+				drawdown10Multiplier: 0.65,
+				// 回撤达到 20% 或 30% 后，不再“大幅/极限降仓”，统一按当前资金 10% 作为基础总仓。
+				drawdownRecoveryRatio: 0.10,
+				// 连亏第 5 期结算为亏损后，从下一期开始停注 4 期；第 5 期本身不计入停注期。
+				loss5PauseRounds: 4,
+				minBetPerState: 1
+			};
+		}
+
+		function getTargetProgress() {
+			const span = simStats.targetBalance - simStats.initBalance;
+			if (span <= 0) return simStats.balance >= simStats.targetBalance ? 1 : 0;
+			return clampNum((simStats.balance - simStats.initBalance) / span, 0, 1);
+		}
+
+		function getStageInfo(profile) {
+			const progress = getTargetProgress();
+			if (simStats.balance < simStats.initBalance) return { key: 'defense', label: '亏损防守区', ratio: profile.defenseRatio, progress };
+			if (progress < 0.30) return { key: 'attack', label: '起步强攻区', ratio: profile.attackRatio, progress };
+			if (progress < 0.60) return { key: 'push', label: '中段推进区', ratio: profile.pushRatio, progress };
+			if (progress < 0.85) return { key: 'steady', label: '后段稳推区', ratio: profile.steadyRatio, progress };
+			return { key: 'final', label: '临门保护区', ratio: profile.finalRatio, progress };
+		}
+
+		function getStreakMultiplier(profile) {
+			// 连亏 1-2 期不降仓；从第 3 期开始降仓。
+			if (simStats.lossStreak >= 4) return { multiplier: profile.loss4Multiplier, label: `连亏${simStats.lossStreak}期深度降仓` };
+			if (simStats.lossStreak >= 3) return { multiplier: profile.loss3Multiplier, label: `连亏${simStats.lossStreak}期开始降仓` };
+			if (simStats.winStreak >= 4) return { multiplier: profile.win4Multiplier, label: `连赢${simStats.winStreak}期加仓` };
+			if (simStats.winStreak === 3) return { multiplier: profile.win3Multiplier, label: '连赢3期加仓' };
+			if (simStats.winStreak === 2) return { multiplier: profile.win2Multiplier, label: '连赢2期加仓' };
+			return { multiplier: 1, label: simStats.lossStreak > 0 ? `连亏${simStats.lossStreak}期未降仓` : '常规仓位' };
+		}
+
+		function getDrawdownInfo(profile) {
+			const peak = Math.max(simStats.peakBalance || simStats.balance, simStats.balance, 1);
+			const rate = clampNum((peak - simStats.balance) / peak, 0, 1);
+			// 只要上一期模拟下注中奖，下一期不继续套用之前的回撤降仓。
+			// 这样可以避免“刚命中一把，下一期仍被旧峰值回撤压仓”的问题。
+			if (simStats.winStreak > 0) {
+				return { rate, multiplier: 1, label: '' };
+			}
+			if (rate >= 0.30) return { rate, multiplier: 1, overrideRatio: profile.drawdownRecoveryRatio, label: '回撤≥30%，按现有资金10%下注' };
+			if (rate >= 0.20) return { rate, multiplier: 1, overrideRatio: profile.drawdownRecoveryRatio, label: '回撤≥20%，按现有资金10%下注' };
+			if (rate >= 0.10) return { rate, multiplier: profile.drawdown10Multiplier, label: '回撤≥10% 降仓' };
+			return { rate, multiplier: 1, overrideRatio: null, label: '回撤正常' };
+		}
+
+		function refreshRiskPauseState(profile) {
+			// 新规则：回撤保护不触发停注；回撤≥20%/≥30% 时，改为按现有资金10%作为基础总仓。
+			// 真正的停注只由“连亏5期后，从下一期开始停注4期”触发。
+			return getDrawdownInfo(profile);
+		}
+
+		function buildIndependentBetPlan(nextPred) {
+			normalizeSimulationStats();
+			const profile = getAggressiveStableProfile();
+			const stage = getStageInfo(profile);
+			const streak = getStreakMultiplier(profile);
+			const drawdown = refreshRiskPauseState(profile);
+			const isTargetReached = simStats.targetBalance > 0 && simStats.balance >= simStats.targetBalance;
+
+			if (isTargetReached) {
+				return { status: 'target_reached', bet1: 0, bet2: 0, betAmount: 0, profile, stage, streak, drawdown, reason: '目标达成停注' };
+			}
+			if (simStats.pauseRounds > 0) {
+				// 只允许连亏5期后的停注；旧版回撤暂停在 normalizeSimulationStats() 已清理。
+				if (simStats.pauseMode !== 'loss5') {
+					simStats.pauseRounds = 0;
+					simStats.pauseMode = '';
+					simStats.pauseTotalRounds = 0;
+					simStats.pauseUsedRounds = 0;
+					simStats.pauseStartAfterPeriod = '';
+				} else {
+					const roundsBefore = simStats.pauseRounds;
+					const pauseMode = simStats.pauseMode;
+					const total = simStats.pauseTotalRounds || profile.loss5PauseRounds || roundsBefore;
+					const index = Math.min(total, (simStats.pauseUsedRounds || 0) + 1);
+					const pauseReason = `连亏5期后停注，第${index}/${total}期`;
+					simStats.pauseUsedRounds = index;
+					simStats.pauseRounds = Math.max(0, simStats.pauseRounds - 1);
+					return { status: 'paused', bet1: 0, bet2: 0, betAmount: 0, profile, stage, streak, drawdown, reason: pauseReason, pauseMode, pauseIndex: simStats.pauseUsedRounds || 0, pauseTotal: simStats.pauseTotalRounds || 0 };
+				}
+			}
+			if (!nextPred || nextPred.isAdvBlock) {
+				return { status: 'watch', bet1: 0, bet2: 0, betAmount: 0, profile, stage, streak, drawdown, reason: '对抗防御触发，空仓' };
+			}
+			if ((nextPred.confidence || 0) < profile.minConfidence) {
+				return { status: 'watch', bet1: 0, bet2: 0, betAmount: 0, profile, stage, streak, drawdown, reason: '置信度不足，空仓' };
+			}
+
+			// 回撤达到 20% 以上时，基础总仓直接切到当前资金的 10%；连亏降仓/连赢加仓仍然参与修正。
+			let baseRatio = (drawdown && typeof drawdown.overrideRatio === 'number' && drawdown.overrideRatio > 0) ? drawdown.overrideRatio : (stage.ratio * (drawdown.multiplier || 1));
+			let rawRatio = baseRatio * streak.multiplier;
+			let finalRatio = Math.min(rawRatio, profile.maxTotalRatio);
+			finalRatio = Math.max(0, finalRatio);
+			let totalBetAmount = Math.floor(simStats.balance * finalRatio);
+			let betPerState = Math.floor(totalBetAmount / 2);
+			if (betPerState < profile.minBetPerState) {
+				return { status: 'watch', bet1: 0, bet2: 0, betAmount: 0, profile, stage, streak, drawdown, ratio: finalRatio, reason: '余额或比例过低，空仓' };
+			}
+			totalBetAmount = betPerState * 2;
+			return {
+				status: 'locked',
+				bet1: betPerState,
+				bet2: betPerState,
+				betAmount: totalBetAmount,
+				profile,
+				stage,
+				streak,
+				drawdown,
+				ratio: finalRatio,
+				reason: [stage.label, streak.label, drawdown.label].filter(Boolean).join(' · ')
+			};
 		}
 
 		function loadSimulationStats() {
@@ -1293,7 +1470,17 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				winBets: 0,
 				lastPeriod: lastPeriodKey,
 				logs: [],
-				pendingBet: null
+				pendingBet: null,
+				peakBalance: initVal,
+				winStreak: 0,
+				lossStreak: 0,
+				pauseRounds: 0,
+				pauseMode: '',
+				lastDrawdownPausePeak: 0,
+				pauseTotalRounds: 0,
+				pauseUsedRounds: 0,
+				pauseStartAfterPeriod: '',
+				strategyVersion: SIM_STRATEGY_VERSION
 			};
 			saveSimulationStats();
 			if (historyData && historyData.length > 0) {
@@ -1307,10 +1494,11 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		function updateSimulationUI() {
 			normalizeSimulationStats();
 			let targetText = simStats.targetBalance > 0 ? `<br><span style="font-size:10px;color:#888;font-weight:normal;">(目标: ￥${simStats.targetBalance.toFixed(2)})</span>` : '';
+			let riskText = `<br><span style="font-size:9px;color:#777;font-weight:normal;">峰值￥${simStats.peakBalance.toFixed(2)}｜连赢${simStats.winStreak}｜连亏${simStats.lossStreak}${simStats.pauseRounds > 0 ? `｜暂停${simStats.pauseRounds}` : ''}</span>`;
 			if (simStats.targetBalance > 0 && simStats.balance >= simStats.targetBalance) {
-				document.getElementById('sim-current-balance').innerHTML = `￥${simStats.balance.toFixed(2)}${targetText}<br><span style="font-size:11px;color:#00b894;font-weight:900;">🏆 目标达成</span>`;
+				document.getElementById('sim-current-balance').innerHTML = `￥${simStats.balance.toFixed(2)}${targetText}<br><span style="font-size:11px;color:#00b894;font-weight:900;">🏆 目标达成</span>${riskText}`;
 			} else {
-				document.getElementById('sim-current-balance').innerHTML = `￥${simStats.balance.toFixed(2)}${targetText}`;
+				document.getElementById('sim-current-balance').innerHTML = `￥${simStats.balance.toFixed(2)}${targetText}${riskText}`;
 			}
 			let profitAmount = simStats.balance - simStats.initBalance;
 			let profitRate = simStats.initBalance > 0 ? (profitAmount / simStats.initBalance) * 100 : 0;
@@ -1318,7 +1506,8 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			let sign = profitAmount >= 0 ? '+' : '';
 			rateEl.innerHTML = `￥${sign}${profitAmount.toFixed(2)}<br>(${sign}${profitRate.toFixed(2)}%)`;
 			rateEl.style.color = profitAmount >= 0 ? '#00b894' : '#ff4757';
-			document.getElementById('sim-win-stats').innerText = `${simStats.winBets} / ${simStats.totalBets}`;
+			const simHitRate = simStats.totalBets > 0 ? Math.floor((simStats.winBets / simStats.totalBets) * 1000) / 10 : 0;
+			document.getElementById('sim-win-stats').innerHTML = `${simStats.winBets} / ${simStats.totalBets}<br><span style="font-size:10px;color:#888;font-weight:normal;">命中率 ${simHitRate.toFixed(1)}%</span>`;
 		}
 
 		function getNextPeriodStr() {
@@ -1347,17 +1536,35 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			}
 		}
 
+		function shouldRefreshPendingAfterStrategyUpgrade() {
+			const bet = simStats.pendingBet;
+			if (!bet || !bet.period || bet.strategy === SIM_STRATEGY_VERSION) return false;
+			if (findHistoryByPeriod(bet.period) || isPeriodExpired(bet.period)) return false;
+			// 旧版可能把回撤≥30%的未开奖单锁成“风控暂停”。新版要求回撤不暂停，
+			// 所以遇到这种未开奖旧锁单，需要重建一次。连亏5期停注单不重建。
+			if (bet.status === 'paused' && (bet.pauseMode || '') !== 'loss5') return true;
+			const oldRiskText = String(bet.riskReason || '');
+			// 新版把回撤≥20%/≥30% 改成“现有资金10%下注”，旧锁单若仍是大幅/极限降仓，重建当前未开奖锁单。
+			if (bet.status === 'locked' && (oldRiskText.includes('回撤≥20') || oldRiskText.includes('回撤≥30') || oldRiskText.includes('大幅降仓') || oldRiskText.includes('极限降仓'))) return true;
+			// 旧版在“上一期中奖后”仍可能把当前未开奖锁单套用旧回撤降仓，保留原来的迁移修复。
+			if (bet.status === 'locked' && simStats.winStreak > 0 && oldRiskText.includes('回撤')) return true;
+			return false;
+		}
+
 		function ensurePendingBetForNextPeriod() {
 			normalizeSimulationStats();
 			if (!historyData || historyData.length < 3) return null;
 
-			// 如果已有锁单，且还没开奖，绝不重新计算，直接复用。
+			// 如果已有锁单，且还没开奖，默认绝不重新计算，直接复用。
+			// 例外：从旧策略升级后，若上一期已中奖但旧锁单仍套用了回撤降仓，则只重算这一次未开奖锁单。
 			if (simStats.pendingBet) {
 				const actual = findHistoryByPeriod(simStats.pendingBet.period);
 				if (actual) {
 					settlePendingBetWithActual(actual);
 				} else if (!isPeriodExpired(simStats.pendingBet.period)) {
-					return simStats.pendingBet;
+					if (!shouldRefreshPendingAfterStrategyUpgrade()) return simStats.pendingBet;
+					console.warn('检测到旧版回撤保护锁单，已按“回撤≥20%改为10%基础仓位”规则重建当前未开奖锁单:', simStats.pendingBet.period);
+					simStats.pendingBet = null;
 				} else {
 					// 数据源已经跳过该期，无法公平结算，清除过期锁单，防止界面卡死。
 					console.warn('模拟投注锁单已过期但未找到开奖结果，已清除:', simStats.pendingBet.period);
@@ -1366,56 +1573,70 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			}
 
 			const nextPeriodStr = getNextPeriodStr();
-			const isTargetReached = simStats.targetBalance > 0 && simStats.balance >= simStats.targetBalance;
-
-			if (isTargetReached) {
-				simStats.pendingBet = {
-					period: nextPeriodStr,
-					combo: '🛑 止盈锁定',
-					state1: '',
-					state2: '',
-					bet1: 0,
-					bet2: 0,
-					betAmount: 0,
-					bestF: 0,
-					confidence: 0,
-					status: 'target_reached',
-					lockedAt: Date.now(),
-					balanceBase: simStats.balance
-				};
-				return simStats.pendingBet;
-			}
-
 			const nextPred = getComboPredictionRaw(historyData, false);
-			let betPerState = 0;
-			let totalBetAmount = 0;
-			let status = 'watch';
-			if (nextPred.bestF > 0 && !nextPred.isAdvBlock && nextPred.confidence >= 0.3) {
-				betPerState = Math.floor(simStats.balance * nextPred.bestF * 0.5);
-				if (betPerState >= 1) {
-					totalBetAmount = betPerState * 2;
-					status = 'locked';
-				}
-			}
+			const plan = buildIndependentBetPlan(nextPred);
+			let comboTag = `${nextPred.state1}/${nextPred.state2}`;
+			if (plan.status === 'locked') comboTag = `独立风控 ${nextPred.state1}/${nextPred.state2}`;
+			if (plan.status === 'target_reached') comboTag = '🛑 止盈锁定';
+			if (plan.status === 'paused') comboTag = '🛡 连亏停注';
+			if (plan.status === 'watch') comboTag = nextPred.isAdvBlock ? `🛑 对抗防御 (${nextPred.state1}/${nextPred.state2})` : `🛑 空仓观望 (${nextPred.state1}/${nextPred.state2})`;
 
 			simStats.pendingBet = {
 				period: nextPeriodStr,
-				combo: nextPred.comboStr,
+				combo: comboTag,
 				state1: nextPred.state1,
 				state2: nextPred.state2,
-				bet1: betPerState,
-				bet2: betPerState,
-				betAmount: totalBetAmount,
+				bet1: plan.bet1,
+				bet2: plan.bet2,
+				betAmount: plan.betAmount,
 				bestF: nextPred.bestF || 0,
 				confidence: nextPred.confidence || 0,
 				isAdvBlock: !!nextPred.isAdvBlock,
-				status,
+				status: plan.status,
 				lockedAt: Date.now(),
 				balanceBase: simStats.balance,
 				odds1: ODDS_MAP[nextPred.state1] || 4.5,
-				odds2: ODDS_MAP[nextPred.state2] || 4.5
+				odds2: ODDS_MAP[nextPred.state2] || 4.5,
+				strategy: SIM_STRATEGY_VERSION,
+				stage: plan.stage ? plan.stage.label : '',
+				ratio: plan.ratio || 0,
+				riskReason: plan.reason || '',
+				drawdownRate: plan.drawdown ? plan.drawdown.rate : 0,
+				winStreak: simStats.winStreak,
+				lossStreak: simStats.lossStreak,
+				pauseMode: plan.pauseMode || simStats.pauseMode || '',
+				pauseIndex: plan.pauseIndex || 0,
+				pauseTotal: plan.pauseTotal || 0,
+				pauseStartAfterPeriod: simStats.pauseStartAfterPeriod || ''
 			};
 			return simStats.pendingBet;
+		}
+
+		function applyPostSettleRiskState(netProfit, settledPeriod = '') {
+			const profile = getAggressiveStableProfile();
+			if (netProfit > 0) {
+				simStats.winStreak++;
+				simStats.lossStreak = 0;
+			} else if (netProfit < 0) {
+				simStats.lossStreak++;
+				simStats.winStreak = 0;
+				if (simStats.lossStreak >= 5 && simStats.pauseRounds <= 0) {
+					// 第 5 期亏损仍然是正常结算的投注；停注从下一期开始，连续停 4 期。
+					simStats.pauseRounds = profile.loss5PauseRounds;
+					simStats.pauseTotalRounds = profile.loss5PauseRounds;
+					simStats.pauseUsedRounds = 0;
+					simStats.pauseStartAfterPeriod = settledPeriod ? String(settledPeriod) : '';
+					simStats.pauseMode = 'loss5';
+				}
+			} else {
+				simStats.winStreak = 0;
+				simStats.lossStreak = 0;
+			}
+			if (simStats.balance > simStats.peakBalance) {
+				simStats.peakBalance = simStats.balance;
+				simStats.lastDrawdownPausePeak = 0;
+			}
+			// 新规则：结算后不再因为回撤触发停注；回撤≥20% 时，下一期以现有资金10%作为基础总仓。
 		}
 
 		function settlePendingBetWithActual(actualItem) {
@@ -1442,6 +1663,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				simStats.balance = simStats.balance + netProfit;
 				simStats.totalBets++;
 				if (isHit) simStats.winBets++;
+				applyPostSettleRiskState(netProfit, actualItem.period);
 				simStats.logs.push({
 					period: actualItem.period,
 					combo: logComboTag,
@@ -1454,8 +1676,56 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 					balanceAfter: simStats.balance,
 					lockedAt: bet.lockedAt,
 					settledAt: Date.now(),
-					actual: actualItem.fullFormat || actualItem.state
+					actual: actualItem.fullFormat || actualItem.state,
+					status: bet.status,
+					strategy: bet.strategy || SIM_STRATEGY_VERSION,
+					stage: bet.stage || '',
+					ratio: bet.ratio || 0,
+					riskReason: bet.riskReason || '',
+					winStreak: simStats.winStreak,
+					lossStreak: simStats.lossStreak,
+					pauseRounds: simStats.pauseRounds,
+				pauseIndex: bet.pauseIndex || 0,
+				pauseTotal: bet.pauseTotal || 0
 				});
+			} else if (bet.status && bet.status !== 'target_reached') {
+				// 空仓、风控暂停也写入固定历史快照，避免当前行跨期消失造成“历史漂移”的感觉。
+				simStats.logs.push({
+					period: actualItem.period,
+					combo: bet.combo || (bet.status === 'paused' ? '🛡 连亏停注' : '🛑 空仓观望'),
+					state1: bet.state1 || '',
+					state2: bet.state2 || '',
+					bet1: 0,
+					bet2: 0,
+					betAmount: 0,
+					netProfit: 0,
+					balanceAfter: simStats.balance,
+					lockedAt: bet.lockedAt,
+					settledAt: Date.now(),
+					actual: actualItem.fullFormat || actualItem.state,
+					status: bet.status,
+					strategy: bet.strategy || SIM_STRATEGY_VERSION,
+					stage: bet.stage || '',
+					ratio: bet.ratio || 0,
+					riskReason: bet.riskReason || '',
+					winStreak: simStats.winStreak,
+					lossStreak: simStats.lossStreak,
+					pauseRounds: simStats.pauseRounds,
+				pauseIndex: bet.pauseIndex || 0,
+				pauseTotal: bet.pauseTotal || 0
+				});
+			}
+
+			if (bet.status === 'paused' && simStats.pauseRounds <= 0) {
+				if ((bet.pauseMode || simStats.pauseMode) === 'loss5') {
+					// 连亏第 5 期亏损后，从下一期开始的 4 期停注已完成，重置连亏并继续循环。
+					simStats.lossStreak = 0;
+					simStats.winStreak = 0;
+				}
+				simStats.pauseMode = '';
+				simStats.pauseTotalRounds = 0;
+				simStats.pauseUsedRounds = 0;
+				simStats.pauseStartAfterPeriod = '';
 			}
 
 			simStats.lastPeriod = actualItem.period;
@@ -1483,20 +1753,25 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				let logComboTag = bet.combo || '--';
 				let currentBetDisplay = '￥0';
 				if (bet.status === 'locked' && bet.betAmount > 0) {
-					currentBetDisplay = `<span style="color:#aaa;">${bet.state1}</span> <span style="color:#ffd700; font-family:monospace;">${bet.bet1}</span><br><span style="color:#aaa;">${bet.state2}</span> <span style="color:#ffd700; font-family:monospace;">${bet.bet2}</span>`;
+					currentBetDisplay = `<span style="color:#aaa;">${bet.state1}</span> <span style="color:#ffd700; font-family:monospace;">${bet.bet1}</span><br><span style="color:#aaa;">${bet.state2}</span> <span style="color:#ffd700; font-family:monospace;">${bet.bet2}</span><br><span style="font-size:9px; color:#777; font-weight:normal;">${bet.stage || ''} ${(bet.ratio ? `｜总仓${(bet.ratio * 100).toFixed(1)}%` : '')}</span>`;
 				} else if (bet.status === 'target_reached') {
 					statusText = '🎉 目标达成停注';
 					statusColor = '#00b894';
 					currentBetDisplay = `<span style="color:#00b894; font-weight:bold;">已达标放假</span>`;
+				} else if (bet.status === 'paused') {
+					statusText = '🛡 连亏停注';
+					statusColor = '#00f0ff';
+					currentBetDisplay = `<span style="color:#00f0ff; font-weight:bold;">${bet.riskReason || '暂停下注'}</span>`;
 				} else {
 					statusText = '🛑 空仓观望中';
 					statusColor = '#888';
 				}
 				const lockedText = bet.lockedAt ? `<br><span style="font-size:9px; color:#777; font-weight:normal;">锁单 ${formatLockTime(bet.lockedAt)}</span>` : '';
+				const riskText = bet.riskReason ? `<br><span style="font-size:9px; color:#777; font-weight:normal;">${bet.riskReason}</span>` : '';
 				htmlBuffer += `
 					<tr style="background: rgba(0, 240, 255, 0.08); border-left: 3px solid var(--glow-blue);">
 						<td style="padding: 10px 4px; color: var(--glow-blue); font-weight: bold;">${bet.period} <span style="font-size:9px; font-weight:normal; opacity:0.7;">(当前锁单)</span>${lockedText}</td>
-						<td style="padding: 10px 4px;"><span class="combo-badge" style="font-size:10px; padding:2px 6px; border-color: var(--glow-blue); color: var(--glow-blue); background: rgba(0,240,255,0.02);">${logComboTag}</span></td>
+						<td style="padding: 10px 4px;"><span class="combo-badge" style="font-size:10px; padding:2px 6px; border-color: var(--glow-blue); color: var(--glow-blue); background: rgba(0,240,255,0.02);">${logComboTag}</span>${riskText}</td>
 						<td style="padding: 10px 4px; font-weight:bold; line-height:1.4; text-align:left; padding-left:14px;">${currentBetDisplay}</td>
 						<td style="padding: 10px 4px; color:${statusColor}; font-weight:bold;">${statusText}</td>
 						<td style="padding: 10px 4px; color:#aaa; font-family:'Courier New',monospace;">--</td>
@@ -1514,13 +1789,17 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				const netColor = log.netProfit > 0 ? '#00b894' : (log.netProfit < 0 ? '#ff4757' : '#ffd700');
 				const netSign = log.netProfit > 0 ? '+' : '';
 				let logBetDisplay = `￥${log.betAmount}`;
-				if (log.state1 && log.state2 && log.bet1 !== undefined) {
+				if (log.state1 && log.state2 && log.bet1 !== undefined && log.betAmount > 0) {
 					logBetDisplay = `<span style="color:#888;">${log.state1}</span> <span style="font-family:monospace;">${log.bet1}</span><br><span style="color:#888;">${log.state2}</span> <span style="font-family:monospace;">${log.bet2}</span>`;
+				} else if (log.status === 'paused') {
+					logBetDisplay = `<span style="color:#00f0ff;font-weight:bold;">停注 0</span>`;
+				} else if (log.status === 'watch') {
+					logBetDisplay = `<span style="color:#888;font-weight:bold;">空仓 0</span>`;
 				}
 				htmlBuffer += `
 					<tr>
 						<td style="padding: 10px 4px; color:#aaa;">${log.period}</td>
-						<td style="padding: 10px 4px;"><span class="combo-badge" style="font-size:10px; padding:2px 6px;">${log.combo}</span></td>
+						<td style="padding: 10px 4px;"><span class="combo-badge" style="font-size:10px; padding:2px 6px;">${log.combo}</span>${log.riskReason ? `<br><span style="font-size:9px;color:#666;">${log.riskReason}</span>` : ''}</td>
 						<td style="padding: 10px 4px; color:#fff; font-weight:bold; line-height:1.4; text-align:left; padding-left:14px;">${logBetDisplay}</td>
 						<td style="padding: 10px 4px; color:${netColor}; font-weight:bold;">${netSign}￥${log.netProfit.toFixed(2)}</td>
 						<td style="padding: 10px 4px; color:#fff; font-family:'Courier New',monospace;">￥${log.balanceAfter.toFixed(2)}</td>
