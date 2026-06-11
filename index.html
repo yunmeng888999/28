@@ -1232,7 +1232,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		}
 
 		const SIM_STORAGE_KEY = 'jnd28_sim_stats_v4';
-		const SIM_STRATEGY_VERSION = 'aggressive_stable_independent_v4_drawdown20_10base_loss5_next4';
+		const SIM_STRATEGY_VERSION = 'aggressive_stable_independent_v5_no_loss_defense_zone';
 
 		function clampNum(v, min, max) {
 			return Math.max(min, Math.min(max, v));
@@ -1272,6 +1272,9 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				.replace(/ · 连赢\d+期，解除旧回撤保护/g, '')
 				.replace(/连赢\d+期，解除旧回撤保护 · /g, '')
 				.replace(/连赢\d+期，解除旧回撤保护/g, '')
+				.replace(/亏损防守区\s*·\s*/g, '')
+				.replace(/\s*·\s*亏损防守区/g, '')
+				.replace(/亏损防守区/g, '')
 				.replace(/ ·  · /g, ' · ')
 				.replace(/^ · | · $/g, '')
 				.trim();
@@ -1307,7 +1310,6 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			return {
 				mode: 'aggressive_stable_upper_limit',
 				minConfidence: 0.30,
-				defenseRatio: 0.04,
 				attackRatio: 0.16,
 				pushRatio: 0.12,
 				steadyRatio: 0.08,
@@ -1336,7 +1338,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 
 		function getStageInfo(profile) {
 			const progress = getTargetProgress();
-			if (simStats.balance < simStats.initBalance) return { key: 'defense', label: '亏损防守区', ratio: profile.defenseRatio, progress };
+			// 不再设置“亏损防守区”：即使余额低于初始资金，也按目标进度从起步强攻区继续执行。
 			if (progress < 0.30) return { key: 'attack', label: '起步强攻区', ratio: profile.attackRatio, progress };
 			if (progress < 0.60) return { key: 'push', label: '中段推进区', ratio: profile.pushRatio, progress };
 			if (progress < 0.85) return { key: 'steady', label: '后段稳推区', ratio: profile.steadyRatio, progress };
