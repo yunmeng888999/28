@@ -454,7 +454,8 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 					<div class="value" id="sim-win-stats" style="font-size:14px; color:#ffd700; line-height:1.25;">0 / 0<br><span style="font-size:10px;color:#888;font-weight:normal;">命中率 0.0%</span></div>
 				</div>
 			</div>
-			<button id="toggle-sim-history-btn" class="btn-sm" onclick="toggleSimHistory()" style="margin-top: 14px; margin-bottom: 0; background: #151515; color: var(--glow-blue); border: 1px solid var(--glow-blue); box-shadow: inset 0 0 5px rgba(0,240,255,0.2); width:100%;">👁️ 显示量化投注明细 (点此展开/隐藏)</button>
+			<button id="copy-sim-plan-btn" class="btn-sm" onclick="copyCurrentBetPlan()" style="margin-top: 14px; margin-bottom: 8px; background: #111; color: #ffd700; border: 1px solid #ffd700; box-shadow: inset 0 0 5px rgba(255,215,0,0.25); width:100%;">📋 复制本期下注计划</button>
+			<button id="toggle-sim-history-btn" class="btn-sm" onclick="toggleSimHistory()" style="margin-top: 6px; margin-bottom: 0; background: #151515; color: var(--glow-blue); border: 1px solid var(--glow-blue); box-shadow: inset 0 0 5px rgba(0,240,255,0.2); width:100%;">👁️ 显示量化投注明细 (点此展开/隐藏)</button>
 			<div id="sim-history-box" style="display: none; margin-top: 14px; max-height: 250px; overflow-y: auto; border: 1px solid #222; border-radius: 12px; background: #070707;">
 				<table style="width: 100%; font-size: 11px;">
 					<thead>
@@ -1740,6 +1741,69 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			try {
 				return new Date(ts).toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 			} catch (e) { return ''; }
+		}
+
+
+		function formatPlanTime(ts) {
+			if (!ts) return '';
+			try {
+				return new Date(ts).toLocaleString('zh-CN', { hour12: false });
+			} catch (e) { return ''; }
+		}
+
+		function buildCurrentBetPlanText() {
+			normalizeSimulationStats();
+			if (!simStats.pendingBet && historyData && historyData.length > 0) {
+				ensurePendingBetForNextPeriod();
+				saveSimulationStats();
+				updateSimulationUI();
+				renderSimHistoryUI();
+			}
+			const bet = simStats.pendingBet;
+			if (!bet) return '本期不下注';
+			if (bet.status === 'locked' && bet.betAmount > 0) {
+				const bet1 = parseInt(bet.bet1 || 0, 10);
+				const bet2 = parseInt(bet.bet2 || 0, 10);
+				const state1 = bet.state1 || '';
+				const state2 = bet.state2 || '';
+				if (bet1 > 0 && bet2 > 0 && state1 && state2) {
+					return `${bet1}${state1}${bet2}${state2}`;
+				}
+			}
+			return '本期不下注';
+		}
+
+		function fallbackCopyText(text) {
+			const textarea = document.createElement('textarea');
+			textarea.value = text;
+			textarea.setAttribute('readonly', 'readonly');
+			textarea.style.position = 'fixed';
+			textarea.style.left = '-9999px';
+			textarea.style.top = '-9999px';
+			document.body.appendChild(textarea);
+			textarea.select();
+			textarea.setSelectionRange(0, textarea.value.length);
+			let ok = false;
+			try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+			document.body.removeChild(textarea);
+			return ok;
+		}
+
+		async function copyCurrentBetPlan() {
+			const text = buildCurrentBetPlanText();
+			let ok = false;
+			try {
+				if (navigator.clipboard && window.isSecureContext) {
+					await navigator.clipboard.writeText(text);
+					ok = true;
+				}
+			} catch (e) { ok = false; }
+			if (!ok) ok = fallbackCopyText(text);
+			if (ok) {
+				alert('已复制本期下注计划');
+			} else {
+				alert('复制失败，请展开投注明细后手动复制。');
+			}
 		}
 
 		function renderSimHistoryUI() {
