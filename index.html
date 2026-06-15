@@ -1076,21 +1076,151 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			{ name: 'PatternMatch', func: calcPatternMatch, disp: '形态模式识别', c: '#74b9ff' },
 		];
 
+
+		// ==================== 模型动态淘汰 + 同向一致性判断 ====================
+		// 说明：模型近期表现只读取已锁定并结算的预测快照，避免用开奖后的历史数据重新计算旧预测。
+		const MODEL_DYNAMIC_FILTER = {
+			enabled: true,
+			window: 30,
+			minSample: 18,
+			weakHitRate: 0.45,
+			strongHitRate: 0.55,
+			freezeHitRate: 0.35,
+			weakMultiplier: 0.55,
+			strongMultiplier: 1.25,
+			freezeMultiplier: 0.05,
+			minAgreement: 8
+		};
+		let modelDynamicPerfCache = { key: '', data: null };
+
+		function getTopStatesFromScores(scoreMap, topN = 2) {
+			return Object.entries(scoreMap || {})
+				.sort((a, b) => (b[1] || 0) - (a[1] || 0))
+				.slice(0, topN)
+				.map(x => x[0]);
+		}
+
+		function getLockedBacktestSource() {
+			try {
+				const stored = localStorage.getItem(SIM_STORAGE_KEY || 'jnd28_sim_stats_v4');
+				if (stored) return JSON.parse(stored);
+			} catch (e) {}
+			try {
+				return simStats && typeof simStats === 'object' ? simStats : null;
+			} catch (e) {
+				return null;
+			}
+		}
+
+		function getActualStateFromLockedLog(log) {
+			if (!log) return '';
+			if (log.actualState && STATES.includes(log.actualState)) return log.actualState;
+			if (log.actual && STATES.includes(log.actual)) return log.actual;
+			const parsed = parseNumbersFromFormat(log.actual || '');
+			return parsed ? parsed.state : '';
+		}
+
+		function getLockedPredictionBacktestRecords() {
+			const source = getLockedBacktestSource();
+			const logs = Array.isArray(source?.logs) ? source.logs : [];
+			return logs
+				.filter(log => log && Array.isArray(log.modelChoices) && log.modelChoices.length > 0 && getActualStateFromLockedLog(log))
+				.map(log => ({
+					period: String(log.period || ''),
+					actualState: getActualStateFromLockedLog(log),
+					modelChoices: log.modelChoices,
+					lockedAt: log.lockedAt || 0,
+					settledAt: log.settledAt || 0
+				}));
+		}
+
+		function getRecentModelPerformanceStats(dataSlice) {
+			const cfg = MODEL_DYNAMIC_FILTER;
+			const emptyStats = { multipliers: {}, details: {}, summary: '' };
+			models.forEach(m => {
+				emptyStats.multipliers[m.name] = 1;
+				emptyStats.details[m.name] = { hitRate: null, samples: 0, status: 'normal', multiplier: 1 };
+			});
+			if (!cfg.enabled) return emptyStats;
+
+			const records = getLockedPredictionBacktestRecords().slice(-cfg.window);
+			const lastPeriodKey = String(dataSlice?.[dataSlice.length - 1]?.period || '');
+			const lastLockedKey = records.length ? `${records.length}|${records[records.length - 1].period}|${records[records.length - 1].settledAt || records[records.length - 1].lockedAt || 0}` : 'none';
+			const cacheKey = `locked|${lastPeriodKey}|${lastLockedKey}|${cfg.window}|${cfg.minSample}`;
+			if (modelDynamicPerfCache.key === cacheKey && modelDynamicPerfCache.data) return modelDynamicPerfCache.data;
+
+			let stats = { multipliers: {}, details: {}, summary: '' };
+			models.forEach(m => {
+				let hits = 0;
+				let samples = 0;
+				records.forEach(rec => {
+					const choice = (rec.modelChoices || []).find(x => x && x.model === m.name);
+					if (!choice || !rec.actualState) return;
+					const lockedTop = Array.isArray(choice.topList) && choice.topList.length ? choice.topList : [choice.choice].filter(Boolean);
+					if (lockedTop.includes(rec.actualState)) hits++;
+					samples++;
+				});
+				let hitRate = samples > 0 ? hits / samples : null;
+				let multiplier = 1;
+				let status = 'normal';
+				if (samples >= cfg.minSample && hitRate !== null) {
+					if (hitRate < cfg.freezeHitRate) {
+						multiplier = cfg.freezeMultiplier;
+						status = 'frozen';
+					} else if (hitRate < cfg.weakHitRate) {
+						multiplier = cfg.weakMultiplier;
+						status = 'weak';
+					} else if (hitRate > cfg.strongHitRate) {
+						multiplier = cfg.strongMultiplier;
+						status = 'strong';
+					}
+				}
+				stats.multipliers[m.name] = multiplier;
+				stats.details[m.name] = { hitRate, samples, status, multiplier };
+			});
+			const frozenCount = Object.values(stats.details).filter(x => x.status === 'frozen').length;
+			const weakCount = Object.values(stats.details).filter(x => x.status === 'weak').length;
+			const strongCount = Object.values(stats.details).filter(x => x.status === 'strong').length;
+			stats.summary = records.length < cfg.minSample ? `锁单样本${records.length}/${cfg.minSample}` : `锁单回测｜强势${strongCount}｜降权${weakCount}｜冻结${frozenCount}`;
+			modelDynamicPerfCache = { key: cacheKey, data: stats };
+			return stats;
+		}
+
+		function getAdaptiveModelWeightPack(dataSlice, baseWeights, enableDynamic = true) {
+			const stats = enableDynamic ? getRecentModelPerformanceStats(dataSlice) : null;
+			let adjusted = {};
+			models.forEach(m => {
+				const base = Math.max(0, baseWeights[m.name] || 0);
+				const mul = stats?.multipliers?.[m.name] ?? 1;
+				adjusted[m.name] = base * mul;
+			});
+			let total = Object.values(adjusted).reduce((a, b) => a + b, 0);
+			if (total <= 0) {
+				models.forEach(m => adjusted[m.name] = 1 / models.length);
+			} else {
+				models.forEach(m => adjusted[m.name] /= total);
+			}
+			return { weights: adjusted, stats };
+		}
+
 		// ==================== 核心预测：融入投票机制 ====================
 		function getComboPredictionRaw(dataSlice, skipAdversarialCheck = false) {
 			if (!dataSlice || dataSlice.length < 2) {
-				return { comboStr: "数据不足", topList: ["大单", "大双"], topScore: "0", bestF: 0, isAdvBlock: false, state1: "大单", state2: "大双", confidence: 0 };
+				return { comboStr: "数据不足", topList: ["大单", "大双"], topScore: "0", bestF: 0, isAdvBlock: false, isAgreementBlock: false, state1: "大单", state2: "大双", confidence: 0, modelAgreement: 0, modelAgreementTotal: models.length };
 			}
 			const bounded = dataSlice.slice(-60);
 			let final = {};
 			let votes = {};
+			let modelChoices = [];
 			STATES.forEach(s => { final[s] = 0; votes[s] = 0; });
 			const activeW = customWeights || weights;
+			const adaptivePack = getAdaptiveModelWeightPack(dataSlice, activeW, !skipAdversarialCheck);
+			const effectiveW = adaptivePack.weights || activeW;
 
-			// --- 优化2：多模型加权与投票机制 ---
+			// --- 多模型加权与投票机制：加入近期模型动态降权/冻结/增强 ---
 			models.forEach(m => {
 				const sc = m.func(bounded);
-				const w = activeW[m.name] || 0;
+				const w = effectiveW[m.name] || 0;
 
 				// 1. 累积概率加权分
 				STATES.forEach(s => final[s] += sc[s] * w);
@@ -1104,6 +1234,8 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 						bestModelChoice = s;
 					}
 				});
+				const topListForModel = getTopStatesFromScores(sc, 2);
+				modelChoices.push({ model: m.name, choice: bestModelChoice, topList: topListForModel, weight: w });
 				votes[bestModelChoice] += w;
 			});
 
@@ -1122,6 +1254,9 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			const sorted = Object.entries(combinedScore).sort((a, b) => b[1] - a[1]);
 			const state1 = sorted[0][0];
 			const state2 = sorted[1][0];
+			const modelAgreementTotal = modelChoices.length || models.length;
+			const modelAgreement = modelChoices.filter(x => x.choice === state1 || x.choice === state2).length;
+			const isAgreementBlock = !skipAdversarialCheck && modelAgreementTotal >= MODEL_DYNAMIC_FILTER.minAgreement && modelAgreement < MODEL_DYNAMIC_FILTER.minAgreement;
 			
 			const totalCombined = sorted[0][1] + sorted[1][1] + sorted[2][1] + sorted[3][1] || 1;
 			const p1 = Math.min(0.95, Math.max(0.05, sorted[0][1] / totalCombined));
@@ -1175,6 +1310,10 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			if (isAdvBlock) {
 				comboStr = `🛑 对抗防御降噪 (${state1}/${state2})`;
 				topScore = `0% [高危规避: 0.0%]`;
+			} else if (isAgreementBlock) {
+				comboStr = `🛑 模型分歧观望 (${state1}/${state2})`;
+				topScore = `0% [一致性不足: ${modelAgreement}/${modelAgreementTotal}]`;
+				bestF = 0;
 			} else if (maxG <= 0 || bestF <= 0 || confidence < 0.3) {
 				comboStr = `🛑 空仓观望 (${state1}/${state2})`;
 				topScore = `0% [建议仓位: 0.0%]`;
@@ -1183,7 +1322,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				topScore = `综合胜率估算 ${displayProb}% [建议仓位: ${(bestF * 100).toFixed(1)}%]`;
 			}
 
-			return { comboStr, topList: [state1, state2], topScore, bestF, isAdvBlock, state1, state2, confidence };
+			return { comboStr, topList: [state1, state2], topScore, bestF, isAdvBlock, isAgreementBlock, state1, state2, confidence, modelAgreement, modelAgreementTotal, modelPerfSummary: adaptivePack.stats ? adaptivePack.stats.summary : '', modelChoices };
 		}
 
 		function getComboPrediction(dataSlice) {
@@ -1233,7 +1372,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		}
 
 		const SIM_STORAGE_KEY = 'jnd28_sim_stats_v4';
-		const SIM_STRATEGY_VERSION = 'aggressive_chase_v1';
+		const SIM_STRATEGY_VERSION = 'aggressive_chase_v2_model_consensus';
 
 		function clampNum(v, min, max) {
 			return Math.max(min, Math.min(max, v));
@@ -1253,6 +1392,17 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			simStats.winBets = parseInt(simStats.winBets || 0, 10) || 0;
 			simStats.lastPeriod = simStats.lastPeriod ? String(simStats.lastPeriod) : '';
 			if (!Array.isArray(simStats.logs)) simStats.logs = [];
+			// 第五项优化：只用真实锁单快照做模型回测，不再用开奖后的历史数据重新计算旧预测。
+			simStats.logs.forEach(log => {
+				if (log && Array.isArray(log.modelChoices)) {
+					log.modelChoices = log.modelChoices.map(x => ({
+						model: x.model,
+						choice: x.choice,
+						topList: Array.isArray(x.topList) ? x.topList.slice(0, 2) : (x.choice ? [x.choice] : []),
+						weight: Number.isFinite(parseFloat(x.weight)) ? parseFloat(x.weight) : 0
+					}));
+				}
+			});
 			simStats.winStreak = parseInt(simStats.winStreak || 0, 10) || 0;
 			simStats.lossStreak = parseInt(simStats.lossStreak || 0, 10) || 0;
 			simStats.pauseRounds = Math.max(0, parseInt(simStats.pauseRounds || 0, 10) || 0);
@@ -1389,6 +1539,9 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			}
 			if (!nextPred || nextPred.isAdvBlock) {
 				return { status: 'watch', bet1: 0, bet2: 0, betAmount: 0, profile, stage, streak, drawdown, reason: '对抗防御触发，空仓' };
+			}
+			if (nextPred.isAgreementBlock) {
+				return { status: 'watch', bet1: 0, bet2: 0, betAmount: 0, profile, stage, streak, drawdown, reason: `模型一致性不足，空仓(${nextPred.modelAgreement || 0}/${nextPred.modelAgreementTotal || models.length})` };
 			}
 			if ((nextPred.confidence || 0) < profile.minConfidence) {
 				return { status: 'watch', bet1: 0, bet2: 0, betAmount: 0, profile, stage, streak, drawdown, reason: '置信度不足，空仓' };
@@ -1554,7 +1707,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			if (plan.status === 'locked') comboTag = `追注策略 ${nextPred.state1}/${nextPred.state2}`;
 			if (plan.status === 'target_reached') comboTag = '🛑 止盈锁定';
 			if (plan.status === 'paused') comboTag = '🛡 连亏停注';
-			if (plan.status === 'watch') comboTag = nextPred.isAdvBlock ? `🛑 对抗防御 (${nextPred.state1}/${nextPred.state2})` : `🛑 空仓观望 (${nextPred.state1}/${nextPred.state2})`;
+			if (plan.status === 'watch') comboTag = nextPred.isAdvBlock ? `🛑 对抗防御 (${nextPred.state1}/${nextPred.state2})` : (nextPred.isAgreementBlock ? `🛑 模型分歧 (${nextPred.state1}/${nextPred.state2})` : `🛑 空仓观望 (${nextPred.state1}/${nextPred.state2})`);
 
 			simStats.pendingBet = {
 				period: nextPeriodStr,
@@ -1567,6 +1720,19 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				bestF: nextPred.bestF || 0,
 				confidence: nextPred.confidence || 0,
 				isAdvBlock: !!nextPred.isAdvBlock,
+				isAgreementBlock: !!nextPred.isAgreementBlock,
+				modelAgreement: nextPred.modelAgreement || 0,
+				modelAgreementTotal: nextPred.modelAgreementTotal || models.length,
+				modelPerfSummary: nextPred.modelPerfSummary || '',
+				lockedPredictionVersion: 'locked_backtest_v1',
+				predictionTopList: Array.isArray(nextPred.topList) ? nextPred.topList.slice(0, 2) : [nextPred.state1, nextPred.state2],
+				predictionCombo: nextPred.comboStr || `${nextPred.state1}/${nextPred.state2}`,
+				modelChoices: Array.isArray(nextPred.modelChoices) ? nextPred.modelChoices.map(x => ({
+					model: x.model,
+					choice: x.choice,
+					topList: Array.isArray(x.topList) ? x.topList.slice(0, 2) : (x.choice ? [x.choice] : []),
+					weight: Number.isFinite(parseFloat(x.weight)) ? parseFloat(x.weight) : 0
+				})) : [],
 				status: plan.status,
 				lockedAt: Date.now(),
 				balanceBase: simStats.balance,
@@ -1660,7 +1826,17 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 					lossStreak: simStats.lossStreak,
 					pauseRounds: simStats.pauseRounds,
 				pauseIndex: bet.pauseIndex || 0,
-				pauseTotal: bet.pauseTotal || 0
+				pauseTotal: bet.pauseTotal || 0,
+						actualState: actualItem.state,
+						lockedPredictionVersion: bet.lockedPredictionVersion || 'locked_backtest_v1',
+						predictionTopList: Array.isArray(bet.predictionTopList) ? bet.predictionTopList.slice(0, 2) : [bet.state1, bet.state2],
+						predictionCombo: bet.predictionCombo || bet.combo || `${bet.state1}/${bet.state2}`,
+						modelChoices: Array.isArray(bet.modelChoices) ? bet.modelChoices.map(x => ({
+							model: x.model,
+							choice: x.choice,
+							topList: Array.isArray(x.topList) ? x.topList.slice(0, 2) : (x.choice ? [x.choice] : []),
+							weight: Number.isFinite(parseFloat(x.weight)) ? parseFloat(x.weight) : 0
+						})) : []
 				});
 			} else if (bet.status && bet.status !== 'target_reached') {
 				// 空仓、风控暂停也写入固定历史快照，避免当前行跨期消失造成“历史漂移”的感觉。
@@ -1686,7 +1862,17 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 					lossStreak: simStats.lossStreak,
 					pauseRounds: simStats.pauseRounds,
 				pauseIndex: bet.pauseIndex || 0,
-				pauseTotal: bet.pauseTotal || 0
+				pauseTotal: bet.pauseTotal || 0,
+						actualState: actualItem.state,
+						lockedPredictionVersion: bet.lockedPredictionVersion || 'locked_backtest_v1',
+						predictionTopList: Array.isArray(bet.predictionTopList) ? bet.predictionTopList.slice(0, 2) : [bet.state1, bet.state2].filter(Boolean),
+						predictionCombo: bet.predictionCombo || bet.combo || '',
+						modelChoices: Array.isArray(bet.modelChoices) ? bet.modelChoices.map(x => ({
+							model: x.model,
+							choice: x.choice,
+							topList: Array.isArray(x.topList) ? x.topList.slice(0, 2) : (x.choice ? [x.choice] : []),
+							weight: Number.isFinite(parseFloat(x.weight)) ? parseFloat(x.weight) : 0
+						})) : []
 				});
 			}
 
