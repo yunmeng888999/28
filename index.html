@@ -19,7 +19,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
-	<title>⚡ JND28 极速预测 · 离线量化对抗特训版 v4.0</title>
+	<title>⚡ JND28 极速预测 · 离线量化对抗特训版 v4.1</title>
 	<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js">
 	</script>
 	<style>
@@ -395,7 +395,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 <body>
 	<div class="container">
 		<div style="padding:4px 4px 10px 4px;">
-			<h1>⚡ JND28 幸运一号 AI v4.0</h1>
+			<h1>⚡ JND28 幸运一号 AI v4.1</h1>
 			<div class="small"><span id="engine-status"></span></div>
 		</div>
 		<div class="top-blocks">
@@ -426,6 +426,25 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 					</tr>
 				</tbody>
 			</table>
+			<div id="multi-window-panel" class="small" style="margin-top:10px; color:#aaa; line-height:1.6; background:#070707; border:1px solid #222; border-radius:12px; padding:10px;">多窗口系统初始化中...</div>
+		</div>
+		<div class="card" style="border: 1px solid #ffd700; box-shadow: 0 0 15px rgba(255,215,0,0.15);">
+			<h2 style="color:#ffd700;">📊 真实锁单回测与有效命中率 <span class="accuracy-badge" id="locked-accuracy-display" style="background:#ffd700; color:#000; box-shadow:0 0 10px #ffd700;">锁单 --</span></h2>
+			<div class="top-blocks" style="grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px;">
+				<div class="top-block" style="min-height:80px; padding:10px 4px; background:#000;">
+					<div class="label" style="font-size:9px; margin-bottom:4px;">✅ 真实锁单命中</div>
+					<div class="value" id="locked-hit-rate" style="font-size:13px; color:#fff; line-height:1.3;">--</div>
+				</div>
+				<div class="top-block" style="min-height:80px; padding:10px 4px; background:#000;">
+					<div class="label" style="font-size:9px; margin-bottom:4px;">📌 有效命中率</div>
+					<div class="value" id="effective-hit-rate" style="font-size:13px; color:#ffd700; line-height:1.3;">--</div>
+				</div>
+				<div class="top-block" style="min-height:80px; padding:10px 4px; background:#000;">
+					<div class="label" style="font-size:9px; margin-bottom:4px;">🎯 出手质量</div>
+					<div class="value" id="action-hit-rate" style="font-size:13px; color:#00f0ff; line-height:1.3;">--</div>
+				</div>
+			</div>
+			<div id="locked-backtest-note" class="small" style="color:#888; line-height:1.5; background:#070707; border:1px solid #222; border-radius:12px; padding:10px;">真实锁单回测只统计本系统在开奖前已经保存的预测快照，不再用开奖后的模型重新回算旧期。</div>
 		</div>
 		<div class="card" style="border: 1px solid var(--glow-blue); box-shadow: 0 0 15px rgba(0,240,255,0.2);">
 			<h2 style="color: var(--glow-blue);">🎮 模拟投注量化训练控制台</h2>
@@ -475,10 +494,10 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			<div class="small" style="margin-top:12px; color: #888; line-height: 1.4;">⚙️ <span style="color:var(--glow-blue); font-weight:bold;">对子与豹子保护防御已上线：</span>系统若检测到开奖结果包含对子或豹子形态且在预测推荐中，将触发对冲回本机制，下注金无损全额返还，不计入负收益。</div>
 		</div>
 		<div class="card">
-			<h2>📈 最近50期表现 <span class="accuracy-badge" id="accuracy-display">命中率 --</span></h2>
+			<h2>📈 最近50条真实锁单表现 <span class="accuracy-badge" id="accuracy-display">锁单 --</span></h2>
 			<div class="history-container">
 				<table>
-					<thead><tr><th style="width:22%;">期号</th><th style="width:36%;">完整开奖</th><th style="width:25%;">预测组合</th><th style="width:17%;">结果</th></tr></thead>
+					<thead><tr><th style="width:22%;">期号</th><th style="width:36%;">完整开奖</th><th style="width:25%;">锁单预测/窗口</th><th style="width:17%;">结果</th></tr></thead>
 					<tbody id="history-tbody"><tr><td colspan="4" class="small">⚡ 正在穿透数据通道...</td></tr></tbody>
 				</table>
 			</div>
@@ -515,6 +534,14 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		let globalSumPredictions = null;
 		let revealState = { step: 0, full: '', nums: [], sum: 0, combination: '' };
 		let simStats = { balance: 500, initBalance: 500, targetBalance: 1000, totalBets: 0, winBets: 0, lastPeriod: "", logs: [] };
+
+		// ==================== v4.1 真实锁单回测 + 多窗口预测配置 ====================
+		const PREDICTION_SNAPSHOT_KEY = 'jnd28_prediction_snapshots_v41';
+		const PREDICTION_VERSION = 'v4.1_real_lock_multi_window';
+		const PREDICTION_WINDOWS = [30, 50, 80, 120, 200];
+		const DEFAULT_PREDICTION_WINDOW = 80;
+		const RANDOM_BASELINE_RATE = 0.50;
+		let predictionStats = { version: PREDICTION_VERSION, snapshots: [] };
 
 		// 扩展模型列表 - 15个模型
 		const INITIAL_WEIGHT = 1 / 15;
@@ -1204,17 +1231,19 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		}
 
 		// ==================== 核心预测：融入投票机制 ====================
-		function getComboPredictionRaw(dataSlice, skipAdversarialCheck = false) {
+		function getComboPredictionRaw(dataSlice, skipAdversarialCheck = false, options = {}) {
 			if (!dataSlice || dataSlice.length < 2) {
 				return { comboStr: "数据不足", topList: ["大单", "大双"], topScore: "0", bestF: 0, isAdvBlock: false, isAgreementBlock: false, state1: "大单", state2: "大双", confidence: 0, modelAgreement: 0, modelAgreementTotal: models.length };
 			}
-			const bounded = dataSlice.slice(-60);
+			const configuredWindow = parseInt(options.windowSize || DEFAULT_PREDICTION_WINDOW, 10) || DEFAULT_PREDICTION_WINDOW;
+			const windowSize = Math.max(10, Math.min(configuredWindow, dataSlice.length));
+			const bounded = dataSlice.slice(-windowSize);
 			let final = {};
 			let votes = {};
 			let modelChoices = [];
 			STATES.forEach(s => { final[s] = 0; votes[s] = 0; });
 			const activeW = customWeights || weights;
-			const adaptivePack = getAdaptiveModelWeightPack(dataSlice, activeW, !skipAdversarialCheck);
+			const adaptivePack = getAdaptiveModelWeightPack(bounded, activeW, !skipAdversarialCheck);
 			const effectiveW = adaptivePack.weights || activeW;
 
 			// --- 多模型加权与投票机制：加入近期模型动态降权/冻结/增强 ---
@@ -1322,11 +1351,82 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				topScore = `综合胜率估算 ${displayProb}% [建议仓位: ${(bestF * 100).toFixed(1)}%]`;
 			}
 
-			return { comboStr, topList: [state1, state2], topScore, bestF, isAdvBlock, isAgreementBlock, state1, state2, confidence, modelAgreement, modelAgreementTotal, modelPerfSummary: adaptivePack.stats ? adaptivePack.stats.summary : '', modelChoices };
+			return { comboStr, topList: [state1, state2], topScore, bestF, isAdvBlock, isAgreementBlock, state1, state2, confidence, modelAgreement, modelAgreementTotal, modelPerfSummary: adaptivePack.stats ? adaptivePack.stats.summary : '', modelChoices, windowSize, combinedScore, displayProb: Math.round((p1 + p2) * 100), p1, p2 };
+		}
+
+		function getSettledPredictionSnapshots(limit = null) {
+			normalizePredictionStats();
+			let list = predictionStats.snapshots.filter(s => s && s.settled && s.actualState && Array.isArray(s.topList) && s.topList.length > 0);
+			list.sort((a, b) => String(a.period).localeCompare(String(b.period), undefined, { numeric: true }));
+			if (limit && list.length > limit) list = list.slice(-limit);
+			return list;
+		}
+
+		function computeSnapshotStats(list) {
+			const total = list.length;
+			const hits = list.filter(s => !!s.hit).length;
+			const hitRate = total ? hits / total : 0;
+			const effective = total ? hitRate - RANDOM_BASELINE_RATE : 0;
+			const actionList = list.filter(s => !!s.actionable);
+			const actionTotal = actionList.length;
+			const actionHits = actionList.filter(s => !!s.hit).length;
+			const actionRate = actionTotal ? actionHits / actionTotal : 0;
+			const actionEffective = actionTotal ? actionRate - RANDOM_BASELINE_RATE : 0;
+			return { total, hits, hitRate, effective, actionTotal, actionHits, actionRate, actionEffective };
+		}
+
+		function getWindowLockedStats(windowSize, limit = 120) {
+			const settled = getSettledPredictionSnapshots(limit).filter(s => parseInt(s.windowSize || 0, 10) === parseInt(windowSize, 10));
+			return computeSnapshotStats(settled);
+		}
+
+		function getWindowSelectionScore(windowSize) {
+			const stats = getWindowLockedStats(windowSize, 160);
+			// 样本不足时使用温和先验，不让某个窗口因1-2期好运被误选。
+			const prior = { 30: 0.498, 50: 0.502, 80: 0.506, 120: 0.501, 200: 0.499 };
+			if (stats.total < 12) {
+				return { score: prior[windowSize] || 0.5, stats, reason: `样本${stats.total}/12，使用先验` };
+			}
+			const sampleBoost = Math.min(0.025, stats.total / 400);
+			const actionQuality = stats.actionTotal >= 8 ? stats.actionEffective * 0.35 : 0;
+			const score = stats.hitRate + actionQuality + sampleBoost;
+			return { score, stats, reason: `锁单${stats.total}期` };
+		}
+
+		function getMultiWindowPrediction(dataSlice, skipAdversarialCheck = false) {
+			if (!dataSlice || dataSlice.length < 2) return getComboPredictionRaw(dataSlice, skipAdversarialCheck, { windowSize: DEFAULT_PREDICTION_WINDOW });
+			const availableWindows = PREDICTION_WINDOWS.filter(w => dataSlice.length >= w);
+			const windows = availableWindows.length ? availableWindows : [Math.max(10, Math.min(DEFAULT_PREDICTION_WINDOW, dataSlice.length))];
+			const comparisons = windows.map(w => {
+				const pred = getComboPredictionRaw(dataSlice, skipAdversarialCheck, { windowSize: w });
+				const pack = getWindowSelectionScore(w);
+				return { windowSize: w, pred, score: pack.score, stats: pack.stats, reason: pack.reason };
+			});
+			comparisons.sort((a, b) => {
+				if (Math.abs(b.score - a.score) > 0.00001) return b.score - a.score;
+				return Math.abs(a.windowSize - DEFAULT_PREDICTION_WINDOW) - Math.abs(b.windowSize - DEFAULT_PREDICTION_WINDOW);
+			});
+			const selected = comparisons[0];
+			const result = Object.assign({}, selected.pred);
+			result.windowSize = selected.windowSize;
+			result.windowSelectionScore = selected.score;
+			result.windowStats = selected.stats;
+			result.windowReason = selected.reason;
+			result.windowComparisons = comparisons.map(x => ({
+				windowSize: x.windowSize,
+				comboStr: x.pred.comboStr,
+				topList: x.pred.topList,
+				score: x.score,
+				samples: x.stats.total,
+				hitRate: x.stats.hitRate,
+				effective: x.stats.effective,
+				reason: x.reason
+			}));
+			return result;
 		}
 
 		function getComboPrediction(dataSlice) {
-			return getComboPredictionRaw(dataSlice, false);
+			return getMultiWindowPrediction(dataSlice, false);
 		}
 
 		function runAdversarialSelfTraining() {
@@ -1701,7 +1801,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			}
 
 			const nextPeriodStr = getNextPeriodStr();
-			const nextPred = getComboPredictionRaw(historyData, false);
+			const nextPred = getComboPrediction(historyData);
 			const plan = buildIndependentBetPlan(nextPred);
 			let comboTag = `${nextPred.state1}/${nextPred.state2}`;
 			if (plan.status === 'locked') comboTag = `追注策略 ${nextPred.state1}/${nextPred.state2}`;
@@ -1724,6 +1824,8 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				modelAgreement: nextPred.modelAgreement || 0,
 				modelAgreementTotal: nextPred.modelAgreementTotal || models.length,
 				modelPerfSummary: nextPred.modelPerfSummary || '',
+				windowSize: nextPred.windowSize || DEFAULT_PREDICTION_WINDOW,
+				windowComparisons: Array.isArray(nextPred.windowComparisons) ? nextPred.windowComparisons.slice(0, 5) : [],
 				lockedPredictionVersion: 'locked_backtest_v1',
 				predictionTopList: Array.isArray(nextPred.topList) ? nextPred.topList.slice(0, 2) : [nextPred.state1, nextPred.state2],
 				predictionCombo: nextPred.comboStr || `${nextPred.state1}/${nextPred.state2}`,
@@ -1821,6 +1923,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 					strategy: bet.strategy || SIM_STRATEGY_VERSION,
 					stage: bet.stage || '',
 					ratio: bet.ratio || 0,
+					windowSize: bet.windowSize || null,
 					riskReason: bet.riskReason || '',
 					winStreak: simStats.winStreak,
 					lossStreak: simStats.lossStreak,
@@ -1857,6 +1960,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 					strategy: bet.strategy || SIM_STRATEGY_VERSION,
 					stage: bet.stage || '',
 					ratio: bet.ratio || 0,
+					windowSize: bet.windowSize || null,
 					riskReason: bet.riskReason || '',
 					winStreak: simStats.winStreak,
 					lossStreak: simStats.lossStreak,
@@ -2117,6 +2221,261 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			renderWeightsTable();
 		}
 
+
+		// ==================== v4.1 真实预测快照系统 ====================
+		function normalizePredictionStats() {
+			if (!predictionStats || typeof predictionStats !== 'object') predictionStats = { version: PREDICTION_VERSION, snapshots: [] };
+			predictionStats.version = PREDICTION_VERSION;
+			if (!Array.isArray(predictionStats.snapshots)) predictionStats.snapshots = [];
+			predictionStats.snapshots = predictionStats.snapshots
+				.filter(s => s && s.period)
+				.map(s => {
+					const top = Array.isArray(s.topList) ? s.topList.filter(x => STATES.includes(x)).slice(0, 2) : [];
+					const actualState = STATES.includes(s.actualState) ? s.actualState : '';
+					return {
+						period: String(s.period),
+						createdAt: parseInt(s.createdAt || s.lockedAt || Date.now(), 10) || Date.now(),
+						settledAt: parseInt(s.settledAt || 0, 10) || 0,
+						settled: !!s.settled,
+						actual: s.actual || '',
+						actualState,
+						hit: typeof s.hit === 'boolean' ? s.hit : (actualState && top.length ? top.includes(actualState) : false),
+						topList: top,
+						comboStr: s.comboStr || s.predictionCombo || top.join('/') || '--',
+						topScore: s.topScore || '',
+						state1: s.state1 || top[0] || '',
+						state2: s.state2 || top[1] || '',
+						windowSize: parseInt(s.windowSize || 0, 10) || null,
+						confidence: Number.isFinite(parseFloat(s.confidence)) ? parseFloat(s.confidence) : 0,
+						modelAgreement: parseInt(s.modelAgreement || 0, 10) || 0,
+						modelAgreementTotal: parseInt(s.modelAgreementTotal || models.length, 10) || models.length,
+						actionable: !!s.actionable,
+						version: s.version || PREDICTION_VERSION,
+						source: s.source || 'live_lock',
+						windowComparisons: Array.isArray(s.windowComparisons) ? s.windowComparisons.slice(0, 5) : []
+					};
+				});
+			const dedup = {};
+			predictionStats.snapshots.forEach(s => {
+				const old = dedup[s.period];
+				if (!old || (s.settled && !old.settled) || (s.createdAt > old.createdAt && old.settled === s.settled)) dedup[s.period] = s;
+			});
+			predictionStats.snapshots = Object.values(dedup).sort((a, b) => String(a.period).localeCompare(String(b.period), undefined, { numeric: true }));
+			if (predictionStats.snapshots.length > 600) predictionStats.snapshots = predictionStats.snapshots.slice(-600);
+			return predictionStats;
+		}
+
+		function loadPredictionStats() {
+			try {
+				const stored = localStorage.getItem(PREDICTION_SNAPSHOT_KEY);
+				if (stored) predictionStats = JSON.parse(stored);
+			} catch (e) {
+				console.warn('真实锁单回测缓存损坏，已重建:', e);
+				predictionStats = { version: PREDICTION_VERSION, snapshots: [] };
+			}
+			normalizePredictionStats();
+			importPredictionSnapshotsFromSimulationLogs(false);
+			savePredictionStats();
+		}
+
+		function savePredictionStats() {
+			normalizePredictionStats();
+			try { localStorage.setItem(PREDICTION_SNAPSHOT_KEY, JSON.stringify(predictionStats)); } catch (e) { console.warn(e); }
+		}
+
+		function importPredictionSnapshotsFromSimulationLogs(shouldSave = true) {
+			try {
+				if (!simStats || !Array.isArray(simStats.logs)) return;
+				normalizePredictionStats();
+				const exists = new Set(predictionStats.snapshots.map(s => String(s.period)));
+				simStats.logs.forEach(log => {
+					if (!log || !log.period || !log.actualState) return;
+					const top = Array.isArray(log.predictionTopList) ? log.predictionTopList.slice(0, 2) : [log.state1, log.state2].filter(Boolean).slice(0, 2);
+					if (top.length === 0 || exists.has(String(log.period))) return;
+					predictionStats.snapshots.push({
+						period: String(log.period),
+						createdAt: log.lockedAt || Date.now(),
+						settledAt: log.settledAt || Date.now(),
+						settled: true,
+						actual: log.actual || '',
+						actualState: log.actualState,
+						hit: top.includes(log.actualState),
+						topList: top,
+						comboStr: log.predictionCombo || log.combo || top.join('/'),
+						topScore: '',
+						state1: top[0] || '',
+						state2: top[1] || '',
+						windowSize: log.windowSize || null,
+						confidence: log.confidence || 0,
+						modelAgreement: log.modelAgreement || 0,
+						modelAgreementTotal: log.modelAgreementTotal || models.length,
+						actionable: log.status === 'locked' && (log.betAmount || 0) > 0,
+						version: log.lockedPredictionVersion || 'sim_locked_import',
+						source: 'sim_locked_import',
+						windowComparisons: []
+					});
+					exists.add(String(log.period));
+				});
+				normalizePredictionStats();
+				if (shouldSave) savePredictionStats();
+			} catch (e) { console.warn('导入模拟锁单快照失败:', e); }
+		}
+
+		function isActionablePrediction(pred) {
+			if (!pred) return false;
+			if (pred.isAdvBlock || pred.isAgreementBlock) return false;
+			if ((pred.bestF || 0) <= 0) return false;
+			if ((pred.confidence || 0) < 0.30) return false;
+			return !/空仓|观望|防御|分歧/.test(pred.comboStr || '');
+		}
+
+		function buildPredictionSnapshot(period, pred) {
+			const top = Array.isArray(pred.topList) ? pred.topList.slice(0, 2) : [pred.state1, pred.state2].filter(Boolean).slice(0, 2);
+			return {
+				period: String(period),
+				createdAt: Date.now(),
+				settledAt: 0,
+				settled: false,
+				actual: '',
+				actualState: '',
+				hit: false,
+				topList: top,
+				comboStr: pred.comboStr || top.join('/'),
+				topScore: pred.topScore || '',
+				state1: pred.state1 || top[0] || '',
+				state2: pred.state2 || top[1] || '',
+				windowSize: pred.windowSize || DEFAULT_PREDICTION_WINDOW,
+				confidence: pred.confidence || 0,
+				modelAgreement: pred.modelAgreement || 0,
+				modelAgreementTotal: pred.modelAgreementTotal || models.length,
+				actionable: isActionablePrediction(pred),
+				version: PREDICTION_VERSION,
+				source: 'live_lock',
+				windowComparisons: Array.isArray(pred.windowComparisons) ? pred.windowComparisons.slice(0, 5) : []
+			};
+		}
+
+		function settlePredictionSnapshots() {
+			normalizePredictionStats();
+			let changed = false;
+			predictionStats.snapshots.forEach(s => {
+				if (!s || s.settled) return;
+				const actual = findHistoryByPeriod(s.period);
+				if (!actual) return;
+				s.settled = true;
+				s.settledAt = Date.now();
+				s.actual = actual.fullFormat || actual.state;
+				s.actualState = actual.state;
+				s.hit = Array.isArray(s.topList) && s.topList.includes(actual.state);
+				changed = true;
+			});
+			if (changed) savePredictionStats();
+			return changed;
+		}
+
+		function ensurePredictionSnapshotForNextPeriod() {
+			if (!historyData || historyData.length < 3) return null;
+			normalizePredictionStats();
+			settlePredictionSnapshots();
+			const nextPeriod = getNextPeriodStr();
+			let existing = predictionStats.snapshots.find(s => String(s.period) === String(nextPeriod) && !s.settled);
+			if (existing) return existing;
+			const pred = getComboPrediction(historyData);
+			const snap = buildPredictionSnapshot(nextPeriod, pred);
+			predictionStats.snapshots.push(snap);
+			savePredictionStats();
+			return snap;
+		}
+
+		function getPendingPredictionSnapshot() {
+			normalizePredictionStats();
+			const nextPeriod = getNextPeriodStr();
+			return predictionStats.snapshots.find(s => String(s.period) === String(nextPeriod) && !s.settled) || null;
+		}
+
+		function snapshotToPrediction(snap) {
+			if (!snap) return null;
+			return {
+				comboStr: snap.comboStr || snap.topList.join('/'),
+				topList: snap.topList || [],
+				topScore: snap.topScore || '',
+				state1: snap.state1 || snap.topList?.[0] || '',
+				state2: snap.state2 || snap.topList?.[1] || '',
+				confidence: snap.confidence || 0,
+				modelAgreement: snap.modelAgreement || 0,
+				modelAgreementTotal: snap.modelAgreementTotal || models.length,
+				windowSize: snap.windowSize || DEFAULT_PREDICTION_WINDOW,
+				windowComparisons: snap.windowComparisons || [],
+				lockedAt: snap.createdAt,
+				actionable: snap.actionable
+			};
+		}
+
+		function formatPercent(v, digits = 1, signed = false) {
+			if (!Number.isFinite(v)) v = 0;
+			const num = (v * 100).toFixed(digits);
+			return signed && v > 0 ? `+${num}%` : `${num}%`;
+		}
+
+		function updateLockedBacktestPanel() {
+			const settled50 = getSettledPredictionSnapshots(50);
+			const settled100 = getSettledPredictionSnapshots(100);
+			const stats50 = computeSnapshotStats(settled50);
+			const stats100 = computeSnapshotStats(settled100);
+			const setText = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+			const badge = document.getElementById('locked-accuracy-display');
+			const mainBadge = document.getElementById('accuracy-display');
+			if (!stats50.total) {
+				if (badge) badge.innerText = '锁单样本 0';
+				if (mainBadge) mainBadge.innerText = '锁单样本 0';
+				setText('locked-hit-rate', `0 / 0<br><span style="font-size:10px;color:#888;font-weight:normal;">等待开奖后结算</span>`);
+				setText('effective-hit-rate', `--<br><span style="font-size:10px;color:#888;font-weight:normal;">随机基准50%</span>`);
+				setText('action-hit-rate', `--<br><span style="font-size:10px;color:#888;font-weight:normal;">高置信出手样本0</span>`);
+				setText('locked-backtest-note', '真实锁单回测从 4.1 运行后的下一期开奖开始累计；不会用开奖后的数据重新回算旧期，所以初始样本少是正常的。');
+				return;
+			}
+			const effColor = stats50.effective >= 0 ? '#00b894' : '#ff4757';
+			if (badge) badge.innerText = `锁单 ${formatPercent(stats50.hitRate)}｜有效 ${formatPercent(stats50.effective, 1, true)}`;
+			if (mainBadge) mainBadge.innerText = `真实锁单 ${formatPercent(stats50.hitRate)} (${stats50.hits}/${stats50.total})｜有效 ${formatPercent(stats50.effective, 1, true)}`;
+			setText('locked-hit-rate', `${stats50.hits} / ${stats50.total}<br><span style="font-size:10px;color:#888;font-weight:normal;">近50锁单 ${formatPercent(stats50.hitRate)}</span>`);
+			setText('effective-hit-rate', `<span style="color:${effColor};">${formatPercent(stats50.effective, 1, true)}</span><br><span style="font-size:10px;color:#888;font-weight:normal;">对比随机50%</span>`);
+			setText('action-hit-rate', `${stats50.actionHits} / ${stats50.actionTotal}<br><span style="font-size:10px;color:#888;font-weight:normal;">出手 ${formatPercent(stats50.actionRate)}</span>`);
+			setText('locked-backtest-note', `近50锁单：${formatPercent(stats50.hitRate)}，有效命中率 ${formatPercent(stats50.effective, 1, true)}；近100锁单：${stats100.total ? formatPercent(stats100.hitRate) + '，有效 ' + formatPercent(stats100.effective, 1, true) : '样本不足'}。有效命中率=真实命中率-随机基准50%。`);
+		}
+
+		function renderWindowComparisonPanel(pred) {
+			const el = document.getElementById('multi-window-panel');
+			if (!el) return;
+			if (!pred || !Array.isArray(pred.windowComparisons) || pred.windowComparisons.length === 0) {
+				el.innerHTML = '多窗口系统：等待足够数据。';
+				return;
+			}
+			const parts = pred.windowComparisons.slice().sort((a, b) => a.windowSize - b.windowSize).map(item => {
+				const isSel = parseInt(item.windowSize, 10) === parseInt(pred.windowSize || 0, 10);
+				const eff = item.samples ? formatPercent(item.effective, 1, true) : '样本不足';
+				return `<span style="display:inline-block; margin:2px 6px 2px 0; padding:3px 7px; border-radius:10px; border:1px solid ${isSel ? '#ffd700' : '#333'}; color:${isSel ? '#ffd700' : '#aaa'};">${isSel ? '★' : ''}${item.windowSize}期 ${item.comboStr}｜${item.samples || 0}样本｜有效${eff}</span>`;
+			});
+			el.innerHTML = `<b style="color:#ffd700;">多窗口自适应：</b>当前选择 <b>${pred.windowSize || DEFAULT_PREDICTION_WINDOW}期</b> 窗口。<br>${parts.join('')}`;
+		}
+
+		function renderLockedHistoryTable() {
+			const tbody = document.getElementById('history-tbody');
+			if (!tbody) return;
+			const settled = getSettledPredictionSnapshots(50);
+			if (!settled.length) {
+				tbody.innerHTML = '<tr><td colspan="4" class="small" style="padding:18px; color:#777;">暂无真实锁单回测记录。系统会从当前下一期开始锁定预测，等开奖后再结算命中与有效命中率。</td></tr>';
+				return;
+			}
+			let htmlBuffer = '';
+			settled.slice().reverse().forEach(s => {
+				const actual = findHistoryByPeriod(s.period);
+				const actualText = s.actual || (actual ? actual.fullFormat : s.actualState || '--');
+				const windowText = s.windowSize ? `<br><span style="font-size:9px;color:#777;font-weight:normal;">窗口${s.windowSize}期｜${s.actionable ? '出手' : '观望/防御'}</span>` : `<br><span style="font-size:9px;color:#777;font-weight:normal;">导入锁单｜${s.actionable ? '出手' : '观望/防御'}</span>`;
+				htmlBuffer += `<tr><td>${s.period}</td><td style="text-align:left;padding-left:14px;font-weight:600;">${actualText}</td><td><span class="combo-badge">${s.comboStr}</span>${windowText}</td><td>${s.hit ? '<span class="hit-badge">√</span>' : '<span class="miss-badge">×</span>'}</td></tr>`;
+			});
+			tbody.innerHTML = htmlBuffer;
+		}
+
 		// ==================== 数据加载 ====================
 		async function loadData(isSilent = false) {
 			const btn = document.getElementById("refreshBtn");
@@ -2171,7 +2530,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 					parsed.sort((a, b) => (parseInt(String(a.period).replace(/\D/g, ''), 10) || 0) - (parseInt(String(b.period).replace(/\D/g, ''), 10) || 0));
 					historyData = parsed;
 					lastFetchTimestamp = Date.now();
-					statusTag.innerHTML = `<span class="engine-type" style="background:#00b894; color:#fff;">📡 实时同步成功 v4.0 (深度300期)</span>`;
+					statusTag.innerHTML = `<span class="engine-type" style="background:#00b894; color:#fff;">📡 实时同步成功 v4.1 (接口300期｜核心多窗口)</span>`;
 				} else if (!historyData.length) {
 					historyData = getFallbackMock();
 					statusTag.innerHTML = `<span class="engine-type" style="background:#ff4757;">🤖 离线沙盒模式</span>`;
@@ -2192,6 +2551,9 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				await trainModelsAsync(historyData);
 				runAdversarialSelfTraining();
 				triggerSimulationSettle();
+				importPredictionSnapshotsFromSimulationLogs(false);
+				settlePredictionSnapshots();
+				ensurePredictionSnapshotForNextPeriod();
 				// 替换原本每期都跑的更新，改为基于50期的严格周期检查
 				periodicWeightEvaluation(); 
 			}
@@ -2318,28 +2680,22 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				document.getElementById("history-tbody").innerHTML = '<tr><td colspan="4" class="small">⏳ 全算法模块载入中...</td></tr>';
 				document.getElementById("next-combo").innerText = "等待数据";
 				document.getElementById("next-score").innerText = "--";
-				document.getElementById("accuracy-display").innerText = "命中率 --";
+				document.getElementById("accuracy-display").innerText = "锁单 --";
+				updateLockedBacktestPanel();
 				return;
 			}
-			const nextPred = getComboPrediction(historyData);
+			settlePredictionSnapshots();
+			let pendingSnap = getPendingPredictionSnapshot();
+			if (!pendingSnap) pendingSnap = ensurePredictionSnapshotForNextPeriod();
+			const nextPred = pendingSnap ? snapshotToPrediction(pendingSnap) : getComboPrediction(historyData);
 			document.getElementById("next-combo").innerText = nextPred.comboStr;
-			document.getElementById("next-score").innerText = nextPred.topScore;
-			const show = Math.min(50, historyData.length);
-			const start = historyData.length - show;
-			let totalHits = 0, predCount = 0;
-			let htmlBuffer = "";
-			for (let i = start; i < historyData.length; i++) {
-				const cur = historyData[i];
-				const ctx = historyData.slice(Math.max(0, i - 50), i);
-				const pastPred = getComboPrediction(ctx);
-				const isHit = pastPred.topList.includes(cur.state);
-				if (isHit) totalHits++;
-				predCount++;
-				htmlBuffer += `<tr><td>${cur.period}</td><td style="text-align:left;padding-left:14px;font-weight:600;">${cur.fullFormat}</td><td><span class="combo-badge">${pastPred.comboStr}</span></td><td>${isHit ? '<span class="hit-badge">√</span>' : '<span class="miss-badge">×</span>'}</td></tr>`;
-			}
-			document.getElementById("history-tbody").innerHTML = htmlBuffer;
-			const accuracy = predCount ? ((totalHits / predCount) * 100).toFixed(1) : 0;
-			document.getElementById("accuracy-display").innerText = `命中率 ${accuracy}% (${totalHits}/${predCount})`;
+			const lockedText = pendingSnap ? `｜已锁单 ${formatLockTime(pendingSnap.createdAt)}` : '';
+			const windowText = nextPred.windowSize ? `｜窗口${nextPred.windowSize}期` : '';
+			document.getElementById("next-score").innerText = `${nextPred.topScore || '--'}${windowText}${lockedText}`;
+			renderWindowComparisonPanel(nextPred);
+			updateLockedBacktestPanel();
+			renderLockedHistoryTable();
+			savePredictionStats();
 		}
 
 		function renderWeightsTable() {
@@ -2386,6 +2742,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		window.onload = function() {
 			initCountdown();
 			resetRevealState();
+			loadPredictionStats();
 			loadSimulationStats();
 			loadData(false);
 		};
