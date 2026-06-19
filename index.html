@@ -19,7 +19,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
-	<title>⚡ JND28 极速预测 · 离线量化对抗特训版 v4.1.1</title>
+	<title>⚡ JND28 极速预测 · 离线量化对抗特训版 v4.1.3</title>
 	<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js">
 	</script>
 	<style>
@@ -395,7 +395,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 <body>
 	<div class="container">
 		<div style="padding:4px 4px 10px 4px;">
-			<h1>⚡ JND28 幸运一号 AI v4.1.1</h1>
+			<h1>⚡ JND28 幸运一号 AI v4.1.3</h1>
 			<div class="small"><span id="engine-status"></span></div>
 		</div>
 		<div class="top-blocks">
@@ -535,10 +535,10 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		let revealState = { step: 0, full: '', nums: [], sum: 0, combination: '' };
 		let simStats = { balance: 500, initBalance: 500, targetBalance: 1000, totalBets: 0, winBets: 0, lastPeriod: "", logs: [] };
 
-		// ==================== v4.1.1 真实锁单回测 + 多窗口公平回测配置 ====================
+		// ==================== v4.1.3 真实锁单回测 + 多窗口公平回测配置 ====================
 		const PREDICTION_SNAPSHOT_KEY = 'jnd28_prediction_snapshots_v411_fair';
 		const LEGACY_PREDICTION_SNAPSHOT_KEY = 'jnd28_prediction_snapshots_v41';
-		const PREDICTION_VERSION = 'v4.1.1_fair_multi_window';
+		const PREDICTION_VERSION = 'v4.1.3_force_display_windows';
 		const PREDICTION_WINDOWS = [30, 50, 80, 120, 200];
 		const DEFAULT_PREDICTION_WINDOW = 80;
 		const RANDOM_BASELINE_RATE = 0.50;
@@ -1398,7 +1398,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		}
 
 		function getWindowLockedStats(windowSize, limit = 160) {
-			// v4.1.1：多窗口公平统计。每期保存所有窗口预测，开奖后所有窗口同步结算。
+			// v4.1.3：多窗口公平统计。每期保存所有窗口预测，开奖后所有窗口同步结算。
 			// 旧版只统计被选中窗口，存在选择偏差；这里不再用旧版 selected-window 样本给窗口打分。
 			const fairRecords = getWindowFairComparisonRecords(windowSize, limit);
 			return computeSnapshotStats(fairRecords);
@@ -1421,41 +1421,69 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		function getMultiWindowPrediction(dataSlice, skipAdversarialCheck = false) {
 			if (!dataSlice || dataSlice.length < 2) return getComboPredictionRaw(dataSlice, skipAdversarialCheck, { windowSize: DEFAULT_PREDICTION_WINDOW });
 			const availableWindows = PREDICTION_WINDOWS.filter(w => dataSlice.length >= w);
-			const windows = availableWindows.length ? availableWindows : [Math.max(10, Math.min(DEFAULT_PREDICTION_WINDOW, dataSlice.length))];
-			const comparisons = windows.map(w => {
+			const selectableWindows = availableWindows.length ? availableWindows : [Math.max(10, Math.min(DEFAULT_PREDICTION_WINDOW, dataSlice.length))];
+			const availableComparisons = selectableWindows.map(w => {
 				const pred = getComboPredictionRaw(dataSlice, skipAdversarialCheck, { windowSize: w });
 				const pack = getWindowSelectionScore(w);
-				return { windowSize: w, pred, score: pack.score, stats: pack.stats, reason: pack.reason };
+				return { windowSize: w, pred, score: pack.score, stats: pack.stats, reason: pack.reason, available: true };
 			});
-			comparisons.sort((a, b) => {
+			availableComparisons.sort((a, b) => {
 				if (Math.abs(b.score - a.score) > 0.00001) return b.score - a.score;
 				return Math.abs(a.windowSize - DEFAULT_PREDICTION_WINDOW) - Math.abs(b.windowSize - DEFAULT_PREDICTION_WINDOW);
 			});
-			const selected = comparisons[0];
+			const selected = availableComparisons[0];
 			const result = Object.assign({}, selected.pred);
 			result.windowSize = selected.windowSize;
 			result.windowSelectionScore = selected.score;
 			result.windowStats = selected.stats;
 			result.windowReason = selected.reason;
-			result.windowComparisons = comparisons.map(x => ({
-				windowSize: x.windowSize,
-				comboStr: x.pred.comboStr,
-				topList: Array.isArray(x.pred.topList) ? x.pred.topList.slice(0, 2) : [],
-				topScore: x.pred.topScore || '',
-				score: x.score,
-				samples: x.stats.total,
-				hitRate: x.stats.hitRate,
-				effective: x.stats.effective,
-				reason: x.reason,
-				confidence: x.pred.confidence || 0,
-				modelAgreement: x.pred.modelAgreement || 0,
-				modelAgreementTotal: x.pred.modelAgreementTotal || models.length,
-				bestF: x.pred.bestF || 0,
-				actionable: isActionablePrediction(x.pred),
-				settled: false,
-				actualState: '',
-				hit: false
-			}));
+
+			const fullComparisons = PREDICTION_WINDOWS.map(w => {
+				const found = availableComparisons.find(x => x.windowSize === w);
+				if (found) {
+					return {
+						windowSize: found.windowSize,
+						comboStr: found.pred.comboStr,
+						topList: Array.isArray(found.pred.topList) ? found.pred.topList.slice(0, 2) : [],
+						topScore: found.pred.topScore || '',
+						score: found.score,
+						samples: found.stats.total,
+						hitRate: found.stats.hitRate,
+						effective: found.stats.effective,
+						reason: found.reason,
+						confidence: found.pred.confidence || 0,
+						modelAgreement: found.pred.modelAgreement || 0,
+						modelAgreementTotal: found.pred.modelAgreementTotal || models.length,
+						bestF: found.pred.bestF || 0,
+						actionable: isActionablePrediction(found.pred),
+						available: true,
+						settled: false,
+						actualState: '',
+						hit: false
+					};
+				}
+				return {
+					windowSize: w,
+					comboStr: '历史不足',
+					topList: [],
+					topScore: '',
+					score: 0,
+					samples: 0,
+					hitRate: 0,
+					effective: 0,
+					reason: `历史数据仅${dataSlice.length}期，未达到${w}期窗口要求`,
+					confidence: 0,
+					modelAgreement: 0,
+					modelAgreementTotal: models.length,
+					bestF: 0,
+					actionable: false,
+					available: false,
+					settled: false,
+					actualState: '',
+					hit: false
+				};
+			});
+			result.windowComparisons = fullComparisons;
 			return result;
 		}
 
@@ -2256,7 +2284,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		}
 
 
-		// ==================== v4.1.1 真实预测快照 + 多窗口公平结算系统 ====================
+		// ==================== v4.1.3 真实预测快照 + 多窗口公平结算系统 ====================
 		function normalizeWindowComparisonRecord(item, parentActualState = '') {
 			if (!item || typeof item !== 'object') return null;
 			const top = Array.isArray(item.topList) ? item.topList.filter(x => STATES.includes(x)).slice(0, 2) : [];
@@ -2430,7 +2458,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				s.actual = actual.fullFormat || actual.state;
 				s.actualState = actual.state;
 				s.hit = Array.isArray(s.topList) && s.topList.includes(actual.state);
-				// v4.1.1：不只结算最终被选中的窗口，而是把当期所有窗口预测全部同步结算。
+				// v4.1.3：不只结算最终被选中的窗口，而是把当期所有窗口预测全部同步结算。
 				if (Array.isArray(s.windowComparisons)) {
 					s.windowComparisons = s.windowComparisons.map(item => {
 						const top = Array.isArray(item.topList) ? item.topList.slice(0, 2) : [];
@@ -2521,16 +2549,76 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			const el = document.getElementById('multi-window-panel');
 			if (!el) return;
 			if (!pred || !Array.isArray(pred.windowComparisons) || pred.windowComparisons.length === 0) {
-				el.innerHTML = '多窗口系统：等待足够数据。';
+				el.innerHTML = '<div style="padding:10px 0;color:#888;">多窗口系统：等待足够数据。</div>';
 				return;
 			}
-			const parts = pred.windowComparisons.slice().sort((a, b) => a.windowSize - b.windowSize).map(item => {
+			const comparisonMap = new Map((pred.windowComparisons || []).map(item => [parseInt(item.windowSize || 0, 10), item]));
+			const cards = PREDICTION_WINDOWS.map(w => comparisonMap.get(w) || {
+				windowSize: w,
+				comboStr: '历史不足',
+				samples: 0,
+				effective: 0,
+				actionable: false,
+				available: false,
+				topList: [],
+				reason: `历史数据未达到${w}期`
+			}).map(item => {
 				const isSel = parseInt(item.windowSize, 10) === parseInt(pred.windowSize || 0, 10);
-				const eff = item.samples ? formatPercent(item.effective, 1, true) : '公平样本不足';
-				const actionMark = item.actionable ? '出手' : '观望';
-				return `<span style="display:inline-block; margin:2px 6px 2px 0; padding:3px 7px; border-radius:10px; border:1px solid ${isSel ? '#ffd700' : '#333'}; color:${isSel ? '#ffd700' : '#aaa'};">${isSel ? '★' : ''}${item.windowSize}期 ${item.comboStr}｜${item.samples || 0}公平样本｜有效${eff}｜${actionMark}</span>`;
-			});
-			el.innerHTML = `<b style="color:#ffd700;">多窗口公平自适应：</b>当前选择 <b>${pred.windowSize || DEFAULT_PREDICTION_WINDOW}期</b> 窗口。<br>${parts.join('')}<br><span style="color:#777;">每期开奖后会同时结算30/50/80/120/200窗口，避免只统计被选中窗口造成样本偏差。</span>`;
+				const available = item.available !== false && Array.isArray(item.topList) && item.topList.length > 0;
+				const eff = item.samples ? formatPercent(item.effective, 1, true) : '样本不足';
+				const effColor = !available ? '#777' : ((item.effective || 0) >= 0 ? '#00b894' : '#ff4757');
+				const statusText = available ? (item.actionable ? '出手' : '观望') : '暂未参与';
+				const statusColor = !available ? '#777' : (item.actionable ? '#ffd700' : '#aaa');
+				const comboText = available ? item.comboStr : '历史不足';
+				const sampleText = available ? `${item.samples || 0}公平样本` : '等待数据';
+				const borderColor = isSel ? '#ffd700' : (available ? '#333' : '#222');
+				const bg = isSel ? 'rgba(255,215,0,0.08)' : (available ? '#080808' : '#050505');
+				const opacity = available ? '1' : '0.62';
+				const star = isSel ? '<span style="color:#ffd700;margin-right:4px;">★</span>' : '';
+				return `
+					<div title="${item.reason || ''}" style="
+						background:${bg};
+						border:1px solid ${borderColor};
+						box-shadow:${isSel ? '0 0 14px rgba(255,215,0,0.22)' : 'none'};
+						border-radius:14px;
+						padding:10px 9px;
+						min-height:92px;
+						opacity:${opacity};
+						display:flex;
+						flex-direction:column;
+						justify-content:space-between;
+						gap:6px;
+					">
+						<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+							<div style="font-size:14px;font-weight:900;color:${isSel ? '#ffd700' : '#ddd'};">${star}${item.windowSize}期</div>
+							<div style="font-size:10px;color:${statusColor};font-weight:900;border:1px solid ${statusColor};border-radius:999px;padding:2px 6px;white-space:nowrap;">${statusText}</div>
+						</div>
+						<div style="font-size:13px;font-weight:900;color:${available ? '#fff' : '#777'};line-height:1.35;word-break:break-all;">${comboText}</div>
+						<div style="font-size:10px;color:#888;line-height:1.45;">
+							<div>样本：<span style="color:#aaa;">${sampleText}</span></div>
+							<div>有效：<span style="color:${effColor};font-weight:900;">${available ? eff : '--'}</span></div>
+						</div>
+					</div>
+				`;
+			}).join('');
+
+			el.innerHTML = `
+				<div style="margin-bottom:8px;line-height:1.5;">
+					<b style="color:#ffd700;">多窗口公平自适应：</b>
+					<span style="color:#aaa;">当前选择</span>
+					<b style="color:#fff;">${pred.windowSize || DEFAULT_PREDICTION_WINDOW}期</b>
+					<span style="color:#aaa;">窗口</span>
+				</div>
+				<div style="
+					display:grid;
+					grid-template-columns:repeat(auto-fit,minmax(118px,1fr));
+					gap:8px;
+					margin-top:8px;
+				">${cards}</div>
+				<div style="margin-top:9px;color:#777;font-size:11px;line-height:1.55;">
+					强制显示30/50/80/120/200全部窗口；灰色卡片代表历史数据不足或暂未参与。等样本足够后会自动加入公平结算。
+				</div>
+			`;
 		}
 
 		function renderLockedHistoryTable() {
@@ -2605,7 +2693,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 					parsed.sort((a, b) => (parseInt(String(a.period).replace(/\D/g, ''), 10) || 0) - (parseInt(String(b.period).replace(/\D/g, ''), 10) || 0));
 					historyData = parsed;
 					lastFetchTimestamp = Date.now();
-					statusTag.innerHTML = `<span class="engine-type" style="background:#00b894; color:#fff;">📡 实时同步成功 v4.1.1 (接口300期｜多窗口公平回测)</span>`;
+					statusTag.innerHTML = `<span class="engine-type" style="background:#00b894; color:#fff;">📡 实时同步成功 v4.1.3 (接口300期｜多窗口公平回测｜窗口卡片显示)</span>`;
 				} else if (!historyData.length) {
 					historyData = getFallbackMock();
 					statusTag.innerHTML = `<span class="engine-type" style="background:#ff4757;">🤖 离线沙盒模式</span>`;
