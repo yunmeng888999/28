@@ -19,7 +19,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
-	<title>⚡ JND28 极速预测 · 离线量化对抗特训版 v4.1.3</title>
+	<title>⚡ JND28 极速预测 · 离线量化对抗特训版 v4.2.0</title>
 	<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js">
 	</script>
 	<style>
@@ -390,12 +390,103 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				padding: 14px;
 			}
 		}
+
+		/* ==================== 紧凑界面优化：仅调整展示，不改变业务逻辑 ==================== */
+		body {
+			padding: 10px;
+			letter-spacing: 0.6px;
+		}
+		.card {
+			border-radius: 20px;
+			padding: 15px 13px;
+			margin-bottom: 14px;
+		}
+		h1 {
+			font-size: 25px;
+			margin-bottom: 4px;
+			letter-spacing: 1.5px;
+		}
+		h2 {
+			margin-bottom: 11px;
+			font-size: 14px;
+			line-height: 1.35;
+			letter-spacing: 1px;
+		}
+		.top-blocks {
+			gap: 8px;
+			margin-bottom: 12px;
+		}
+		.top-block {
+			border-radius: 14px;
+			padding: 12px 6px;
+			min-height: 86px;
+		}
+		.top-block .label {
+			margin-bottom: 6px;
+			letter-spacing: 1.4px;
+		}
+		.countdown-banner {
+			padding: 11px;
+			border-radius: 14px;
+			margin-bottom: 12px;
+		}
+		button {
+			padding: 13px;
+			border-radius: 14px;
+			margin-bottom: 12px;
+		}
+		.btn-sm {
+			padding: 10px 12px;
+			border-radius: 11px;
+		}
+		th, td {
+			padding: 10px 4px;
+		}
+		.history-container {
+			max-height: 360px;
+		}
+		#multi-window-panel {
+			margin-top: 8px !important;
+			padding: 9px !important;
+		}
+		#sim-history-box {
+			margin-top: 10px !important;
+		}
+		#sim-history-box table {
+			min-width: 520px;
+			font-size: 10px !important;
+		}
+		#sim-history-box th {
+			padding: 8px 3px !important;
+			white-space: nowrap;
+		}
+		#sim-history-box td {
+			vertical-align: middle;
+		}
+		.btn-group {
+			margin-top: 11px;
+			gap: 8px;
+		}
+		@media(max-width:400px) {
+			body { padding: 7px; }
+			.card {
+				padding: 12px 9px;
+				margin-bottom: 12px;
+				border-radius: 17px;
+			}
+			h1 { font-size: 21px; }
+			h2 { font-size: 13px; }
+			.top-block { min-height: 76px; }
+			button { padding: 12px; }
+			th, td { padding: 8px 2px; }
+		}
+
 	</style>
 </head>
 <body>
 	<div class="container">
 		<div style="padding:4px 4px 10px 4px;">
-			<h1>⚡ JND28 幸运一号 AI v4.1.3</h1>
+			<h1>⚡ JND28 幸运一号 AI v4.2.0</h1>
 			<div class="small"><span id="engine-status"></span></div>
 		</div>
 		<div class="top-blocks">
@@ -413,7 +504,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			</div>
 		</div>
 		<div class="countdown-banner">⏳ 距离下期开奖 <span id="countdown-val">00:00</span></div>
-		<button id="refreshBtn" onclick="manualTrigger()">🔄 强制穿透同步最新 data</button>
+		<button id="refreshBtn" onclick="manualTrigger()">🔄 同步最新数据</button>
 		<div class="card">
 			<h2>🔮 下一期 AI 投票对冲预测</h2>
 			<table>
@@ -444,10 +535,9 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 					<div class="value" id="action-hit-rate" style="font-size:13px; color:#00f0ff; line-height:1.3;">--</div>
 				</div>
 			</div>
-			<div id="locked-backtest-note" class="small" style="color:#888; line-height:1.5; background:#070707; border:1px solid #222; border-radius:12px; padding:10px;">真实锁单回测只统计本系统在开奖前已经保存的预测快照，不再用开奖后的模型重新回算旧期。</div>
 		</div>
 		<div class="card" style="border: 1px solid var(--glow-blue); box-shadow: 0 0 15px rgba(0,240,255,0.2);">
-			<h2 style="color: var(--glow-blue);">🎮 模拟投注量化训练控制台</h2>
+			<h2 style="color: var(--glow-blue);">🎮 模拟投注量化训练控制台 · 固定30元倍投</h2>
 			<div style="display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; align-items: center;">
 				<div>
 					<span class="small" style="color:#aaa;">设定初始资产:</span>
@@ -473,15 +563,15 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 					<div class="value" id="sim-win-stats" style="font-size:14px; color:#ffd700; line-height:1.25;">0 / 0<br><span style="font-size:10px;color:#888;font-weight:normal;">命中率 0.0%</span></div>
 				</div>
 			</div>
-			<button id="copy-sim-plan-btn" class="btn-sm" onclick="copyCurrentBetPlan()" style="margin-top: 14px; margin-bottom: 8px; background: #111; color: #ffd700; border: 1px solid #ffd700; box-shadow: inset 0 0 5px rgba(255,215,0,0.25); width:100%;">📋 复制本期下注计划</button>
-			<button id="toggle-sim-history-btn" class="btn-sm" onclick="toggleSimHistory()" style="margin-top: 6px; margin-bottom: 0; background: #151515; color: var(--glow-blue); border: 1px solid var(--glow-blue); box-shadow: inset 0 0 5px rgba(0,240,255,0.2); width:100%;">👁️ 显示量化投注明细 (点此展开/隐藏)</button>
-			<div id="sim-history-box" style="display: none; margin-top: 14px; max-height: 250px; overflow-y: auto; border: 1px solid #222; border-radius: 12px; background: #070707;">
+			<button id="copy-sim-plan-btn" class="btn-sm" onclick="copyCurrentBetPlan()" style="margin-top: 14px; margin-bottom: 8px; background: #111; color: #ffd700; border: 1px solid #ffd700; box-shadow: inset 0 0 5px rgba(255,215,0,0.25); width:100%;">📋 复制下注计划</button>
+			<button id="toggle-sim-history-btn" class="btn-sm" onclick="toggleSimHistory()" style="margin-top: 6px; margin-bottom: 0; background: #151515; color: var(--glow-blue); border: 1px solid var(--glow-blue); box-shadow: inset 0 0 5px rgba(0,240,255,0.2); width:100%;">👁️ 显示/隐藏投注明细</button>
+			<div id="sim-history-box" style="display: none; margin-top: 10px; max-height: 280px; overflow:auto; border: 1px solid #222; border-radius: 12px; background: #070707;">
 				<table style="width: 100%; font-size: 11px;">
 					<thead>
 						<tr style="background: #0d0d0d; color: #888;">
 							<th style="padding: 8px 4px;">期号</th>
 							<th style="padding: 8px 4px;">投注组合</th>
-							<th style="padding: 8px 4px; text-align: left; padding-left: 12px;">下注明细(整数)</th>
+							<th style="padding: 8px 4px; text-align: left; padding-left: 12px;">下注金额</th>
 							<th style="padding: 8px 4px;">实际盈亏</th>
 							<th style="padding: 8px 4px;">结算余额</th>
 						</tr>
@@ -491,7 +581,6 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 					</tbody>
 				</table>
 			</div>
-			<div class="small" style="margin-top:12px; color: #888; line-height: 1.4;">⚙️ <span style="color:var(--glow-blue); font-weight:bold;">对子与豹子保护防御已上线：</span>系统若检测到开奖结果包含对子或豹子形态且在预测推荐中，将触发对冲回本机制，下注金无损全额返还，不计入负收益。</div>
 		</div>
 		<div class="card">
 			<h2>📈 最近50条真实锁单表现 <span class="accuracy-badge" id="accuracy-display">锁单 --</span></h2>
@@ -535,13 +624,21 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		let revealState = { step: 0, full: '', nums: [], sum: 0, combination: '' };
 		let simStats = { balance: 500, initBalance: 500, targetBalance: 1000, totalBets: 0, winBets: 0, lastPeriod: "", logs: [] };
 
-		// ==================== v4.1.3 真实锁单回测 + 多窗口公平回测配置 ====================
+		// ==================== v4.2.0 真实锁单回测 + 多窗口公平回测配置 ====================
 		const PREDICTION_SNAPSHOT_KEY = 'jnd28_prediction_snapshots_v411_fair';
 		const LEGACY_PREDICTION_SNAPSHOT_KEY = 'jnd28_prediction_snapshots_v41';
-		const PREDICTION_VERSION = 'v4.1.3_force_display_windows';
+		const PREDICTION_VERSION = 'v4.2.0_accuracy_integrity';
 		const PREDICTION_WINDOWS = [30, 50, 80, 120, 200];
 		const DEFAULT_PREDICTION_WINDOW = 80;
-		const RANDOM_BASELINE_RATE = 0.50;
+		const DEFAULT_RANDOM_BASELINE_RATE = 0.50;
+		const STATE_BASE_RATE = Object.freeze({
+			"小单": 269 / 1000,
+			"大双": 269 / 1000,
+			"小双": 231 / 1000,
+			"大单": 231 / 1000
+		});
+		const HISTORY_CACHE_KEY = 'jnd28_history_cache_v42_500';
+		const MODEL_PERF_STATE_KEY = 'jnd28_model_perf_state_v42';
 		let predictionStats = { version: PREDICTION_VERSION, snapshots: [] };
 
 		// 扩展模型列表 - 15个模型
@@ -565,6 +662,13 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		};
 		let customWeights = null;
 		let modelRecentPerformance = {};
+		let isHistoricalBacktestMode = false;
+		try {
+			const savedPerf = JSON.parse(localStorage.getItem(MODEL_PERF_STATE_KEY) || '{}');
+			if (savedPerf && typeof savedPerf === 'object') modelRecentPerformance = savedPerf;
+		} catch (e) {
+			modelRecentPerformance = {};
+		}
 
 		// ==================== 数据解析增强 ====================
 		function getState(sum) { return (sum <= 13 ? "小" : "大") + (sum % 2 === 0 ? "双" : "单"); }
@@ -598,6 +702,108 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			const t2 = Object.values(res).reduce((a, b) => a + b, 0);
 			STATES.forEach(s => res[s] /= t2);
 			return res;
+		}
+
+
+		function runInHistoricalBacktest(fn) {
+			const previous = isHistoricalBacktestMode;
+			isHistoricalBacktestMode = true;
+			try { return fn(); } finally { isHistoricalBacktestMode = previous; }
+		}
+
+		function getComboBaseline(topList) {
+			const unique = [...new Set((Array.isArray(topList) ? topList : []).filter(x => STATES.includes(x)))];
+			if (!unique.length) return DEFAULT_RANDOM_BASELINE_RATE;
+			return unique.reduce((sum, state) => sum + (STATE_BASE_RATE[state] || 0.25), 0);
+		}
+
+		function normalizeModelScoreMap(raw, fallbackUniform = false) {
+			if (!raw || typeof raw !== 'object') {
+				if (!fallbackUniform) return null;
+				return Object.fromEntries(STATES.map(s => [s, 0.25]));
+			}
+			const map = {};
+			let total = 0;
+			STATES.forEach(state => {
+				const value = parseFloat(raw[state]);
+				map[state] = Number.isFinite(value) && value >= 0 ? value : 0;
+				total += map[state];
+			});
+			if (total <= 0) {
+				if (!fallbackUniform) return null;
+				return Object.fromEntries(STATES.map(s => [s, 0.25]));
+			}
+			STATES.forEach(state => map[state] /= total);
+			return map;
+		}
+
+		function sanitizeModelChoice(choice) {
+			if (!choice || !choice.model) return null;
+			const scores = normalizeModelScoreMap(choice.scores, false);
+			return {
+				model: String(choice.model),
+				choice: STATES.includes(choice.choice) ? choice.choice : '',
+				topList: Array.isArray(choice.topList) ? choice.topList.filter(x => STATES.includes(x)).slice(0, 2) : (STATES.includes(choice.choice) ? [choice.choice] : []),
+				weight: Number.isFinite(parseFloat(choice.weight)) ? parseFloat(choice.weight) : 0,
+				scores: scores || undefined
+			};
+		}
+
+		function evaluateModelChoice(choice, actualState) {
+			if (!choice || !STATES.includes(actualState)) return null;
+			const topList = Array.isArray(choice.topList) && choice.topList.length
+				? choice.topList.filter(x => STATES.includes(x)).slice(0, 2)
+				: [choice.choice].filter(x => STATES.includes(x));
+			const top1Hit = topList[0] === actualState ? 1 : 0;
+			const top2Hit = topList.includes(actualState) ? 1 : 0;
+			const scores = normalizeModelScoreMap(choice.scores, false);
+			let probabilityQuality = null;
+			if (scores) {
+				let brier = 0;
+				STATES.forEach(state => {
+					const target = state === actualState ? 1 : 0;
+					brier += Math.pow(scores[state] - target, 2);
+				});
+				probabilityQuality = Math.max(0, Math.min(1, 1 - brier / 2));
+			}
+			return { top1Hit, top2Hit, probabilityQuality };
+		}
+
+		function normalizeHistoryRecord(item) {
+			if (!item || !item.period) return null;
+			const period = String(item.period);
+			const fullFormat = String(item.fullFormat || item.pureFormula || '');
+			const parsed = parseNumbersFromFormat(fullFormat);
+			const state = STATES.includes(item.state) ? item.state : (parsed ? parsed.state : '');
+			if (!state) return null;
+			return { period, state, fullFormat, pureFormula: fullFormat };
+		}
+
+		function sortHistoryRecords(list) {
+			return list.sort((a, b) => String(a.period).localeCompare(String(b.period), undefined, { numeric: true }));
+		}
+
+		function loadHistoryCache() {
+			try {
+				const stored = JSON.parse(localStorage.getItem(HISTORY_CACHE_KEY) || '[]');
+				if (!Array.isArray(stored)) return [];
+				const dedup = new Map();
+				stored.map(normalizeHistoryRecord).filter(Boolean).forEach(item => dedup.set(item.period, item));
+				return sortHistoryRecords(Array.from(dedup.values())).slice(-(window.V4_CONFIG?.MAX_HISTORY_CACHE || 500));
+			} catch (e) {
+				console.warn('历史缓存读取失败:', e);
+				return [];
+			}
+		}
+
+		function mergeHistoryCache(newRecords) {
+			const dedup = new Map();
+			loadHistoryCache().forEach(item => dedup.set(item.period, item));
+			(Array.isArray(newRecords) ? newRecords : []).map(normalizeHistoryRecord).filter(Boolean).forEach(item => dedup.set(item.period, item));
+			const limit = Math.max(200, parseInt(window.V4_CONFIG?.MAX_HISTORY_CACHE || 500, 10) || 500);
+			const merged = sortHistoryRecords(Array.from(dedup.values())).slice(-limit);
+			try { localStorage.setItem(HISTORY_CACHE_KEY, JSON.stringify(merged)); } catch (e) { console.warn('历史缓存保存失败:', e); }
+			return merged;
 		}
 
 		// ==================== 增强版特征提取 ====================
@@ -637,117 +843,109 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			return features;
 		}
 
-		// ==================== TFJS 增强神经网络 ====================
+		// ==================== TFJS 小样本防过拟合神经网络 ====================
 		async function trainModelsAsync(d) {
-			if (!window.tf || d.length < 20) return;
+			if (!window.tf || !Array.isArray(d) || d.length < 40) return;
+			let tensorXsState, tensorYsState, tensorXsSum, tensorYsSum, stateLabelTensor;
+			let modelState, modelSum;
 			try {
 				const enhancedFeatures = extractEnhancedFeatures(d);
-				if (!enhancedFeatures || enhancedFeatures.length < 20) return;
+				if (!enhancedFeatures || enhancedFeatures.length < 40) return;
 				const lookback = 16;
-				const xs_state = [],
-					xs_sum = [],
-					ys_state = [],
-					ys_sum = [];
+				const xs_state = [], xs_sum = [], ys_state = [], ys_sum = [];
 				for (let i = lookback; i < enhancedFeatures.length; i++) {
-					const windowSlice = [];
-					const windowSum = [];
+					const windowSlice = [], windowSum = [];
 					for (let j = lookback; j >= 1; j--) {
 						const feat = enhancedFeatures[i - j];
-						windowSlice.push(feat.stateIdx / 3);
-						windowSlice.push(feat.isPair);
-						windowSlice.push(feat.isTriple);
-						windowSlice.push(feat.span / 9);
-						windowSlice.push(feat.sumMod3 / 2);
-						windowSlice.push(feat.sumMod4 / 3);
-						windowSum.push(feat.sum / 27);
-						windowSum.push(feat.span / 9);
-						windowSum.push(feat.n1 / 9);
-						windowSum.push(feat.n2 / 9);
-						windowSum.push(feat.n3 / 9);
+						windowSlice.push(feat.stateIdx / 3, feat.isPair, feat.isTriple, feat.span / 9, feat.sumMod3 / 2, feat.sumMod4 / 3);
+						windowSum.push(feat.sum / 27, feat.span / 9, feat.n1 / 9, feat.n2 / 9, feat.n3 / 9);
 					}
 					xs_state.push(windowSlice);
 					xs_sum.push(windowSum);
 					ys_state.push(enhancedFeatures[i].stateIdx);
 					ys_sum.push(enhancedFeatures[i].sum / 27);
 				}
-				if (xs_state.length === 0) return;
+				if (xs_state.length < 20) return;
+				const validationSplit = xs_state.length >= 60 ? 0.20 : 0.10;
+				const earlyStop = (monitor) => (tf.callbacks && tf.callbacks.earlyStopping)
+					? [tf.callbacks.earlyStopping({ monitor, patience: 6, restoreBestWeights: true, minDelta: 0.0005 })]
+					: [];
 
-				// 状态预测模型
-				const tensorXsState = tf.tensor2d(xs_state);
-				const tensorYsState = tf.oneHot(tf.tensor1d(ys_state, 'int32'), 4);
-				let modelState;
+				// 状态模型：缩小到 24 → 12 → 4，按时序顺序训练并使用验证集早停。
+				tensorXsState = tf.tensor2d(xs_state);
+				stateLabelTensor = tf.tensor1d(ys_state, 'int32');
+				tensorYsState = tf.oneHot(stateLabelTensor, 4);
+				stateLabelTensor.dispose();
+				stateLabelTensor = null;
 				try {
-					modelState = await tf.loadLayersModel('localstorage://jnd28-state-model-v4');
-					modelState.compile({ optimizer: tf.train.adam(0.005), loss: 'categoricalCrossentropy',
-						metrics: ['accuracy'] });
+					modelState = await tf.loadLayersModel('localstorage://jnd28-state-model-v42-small');
 				} catch (e) {
 					modelState = tf.sequential();
-					modelState.add(tf.layers.dense({ units: 48, activation: 'swish', inputShape: [xs_state[0]
-							.length
-						] }));
-					modelState.add(tf.layers.dropout({ rate: 0.2 }));
-					modelState.add(tf.layers.dense({ units: 32, activation: 'swish' }));
+					modelState.add(tf.layers.dense({ units: 24, activation: 'swish', inputShape: [xs_state[0].length], kernelRegularizer: tf.regularizers.l2({ l2: 0.0005 }) }));
 					modelState.add(tf.layers.dropout({ rate: 0.15 }));
-					modelState.add(tf.layers.dense({ units: 16, activation: 'swish' }));
+					modelState.add(tf.layers.dense({ units: 12, activation: 'swish', kernelRegularizer: tf.regularizers.l2({ l2: 0.0005 }) }));
 					modelState.add(tf.layers.dense({ units: 4, activation: 'softmax' }));
-					modelState.compile({ optimizer: tf.train.adam(0.008), loss: 'categoricalCrossentropy',
-						metrics: ['accuracy'] });
 				}
-				await modelState.fit(tensorXsState, tensorYsState, { epochs: 40, verbose: 0, batchSize: 8,
-					shuffle: true });
-				try { await modelState.save('localstorage://jnd28-state-model-v4'); } catch (e) {}
+				modelState.compile({ optimizer: tf.train.adam(0.003), loss: 'categoricalCrossentropy', metrics: ['accuracy'] });
+				await modelState.fit(tensorXsState, tensorYsState, {
+					epochs: 80, verbose: 0, batchSize: 16, shuffle: false, validationSplit,
+					callbacks: earlyStop('val_loss')
+				});
+				try { await modelState.save('localstorage://jnd28-state-model-v42-small'); } catch (e) {}
 				const lastFeatState = [];
 				for (let j = lookback; j >= 1; j--) {
 					const feat = enhancedFeatures[enhancedFeatures.length - j];
-					lastFeatState.push(feat.stateIdx / 3, feat.isPair, feat.isTriple, feat.span / 9, feat.sumMod3 / 2,
-						feat.sumMod4 / 3);
+					lastFeatState.push(feat.stateIdx / 3, feat.isPair, feat.isTriple, feat.span / 9, feat.sumMod3 / 2, feat.sumMod4 / 3);
 				}
-				const predStateTensor = modelState.predict(tf.tensor2d([lastFeatState]));
+				const stateInput = tf.tensor2d([lastFeatState]);
+				const predStateTensor = modelState.predict(stateInput);
 				const resState = await predStateTensor.data();
 				globalTFJSPredictions = {};
 				STATES.forEach((st, idx) => { globalTFJSPredictions[st] = Math.max(0.01, resState[idx]); });
+				stateInput.dispose();
 				predStateTensor.dispose();
-				tensorXsState.dispose();
-				tensorYsState.dispose();
-				modelState.dispose();
 
-				// 和值预测模型
-				const tensorXsSum = tf.tensor2d(xs_sum);
-				const tensorYsSum = tf.tensor1d(ys_sum);
-				let modelSum;
+				// 和值模型：缩小到 20 → 10 → 1，同样按时序顺序训练。
+				tensorXsSum = tf.tensor2d(xs_sum);
+				tensorYsSum = tf.tensor1d(ys_sum);
 				try {
-					modelSum = await tf.loadLayersModel('localstorage://jnd28-sum-model-v4');
-					modelSum.compile({ optimizer: tf.train.adam(0.003), loss: 'meanSquaredError' });
+					modelSum = await tf.loadLayersModel('localstorage://jnd28-sum-model-v42-small');
 				} catch (e) {
 					modelSum = tf.sequential();
-					modelSum.add(tf.layers.dense({ units: 40, activation: 'swish', inputShape: [xs_sum[0].length] }));
-					modelSum.add(tf.layers.dropout({ rate: 0.2 }));
-					modelSum.add(tf.layers.dense({ units: 24, activation: 'swish' }));
+					modelSum.add(tf.layers.dense({ units: 20, activation: 'swish', inputShape: [xs_sum[0].length], kernelRegularizer: tf.regularizers.l2({ l2: 0.0005 }) }));
+					modelSum.add(tf.layers.dropout({ rate: 0.15 }));
+					modelSum.add(tf.layers.dense({ units: 10, activation: 'swish' }));
 					modelSum.add(tf.layers.dense({ units: 1, activation: 'sigmoid' }));
-					modelSum.compile({ optimizer: tf.train.adam(0.005), loss: 'meanSquaredError' });
 				}
-				await modelSum.fit(tensorXsSum, tensorYsSum, { epochs: 35, verbose: 0, batchSize: 8, shuffle: true });
-				try { await modelSum.save('localstorage://jnd28-sum-model-v4'); } catch (e) {}
+				modelSum.compile({ optimizer: tf.train.adam(0.0025), loss: 'meanSquaredError' });
+				await modelSum.fit(tensorXsSum, tensorYsSum, {
+					epochs: 80, verbose: 0, batchSize: 16, shuffle: false, validationSplit,
+					callbacks: earlyStop('val_loss')
+				});
+				try { await modelSum.save('localstorage://jnd28-sum-model-v42-small'); } catch (e) {}
 				const lastFeatSum = [];
 				for (let j = lookback; j >= 1; j--) {
 					const feat = enhancedFeatures[enhancedFeatures.length - j];
 					lastFeatSum.push(feat.sum / 27, feat.span / 9, feat.n1 / 9, feat.n2 / 9, feat.n3 / 9);
 				}
-				const predSumTensor = modelSum.predict(tf.tensor2d([lastFeatSum]));
+				const sumInput = tf.tensor2d([lastFeatSum]);
+				const predSumTensor = modelSum.predict(sumInput);
 				const resSum = await predSumTensor.data();
 				globalSumPredictions = resSum[0] * 27;
+				sumInput.dispose();
 				predSumTensor.dispose();
-				tensorXsSum.dispose();
-				tensorYsSum.dispose();
-				modelSum.dispose();
 			} catch (e) {
-				console.error("TFJS训练异常:", e);
+				console.error('TFJS训练异常:', e);
+			} finally {
+				[tensorXsState, tensorYsState, tensorXsSum, tensorYsSum, stateLabelTensor].forEach(t => { try { if (t) t.dispose(); } catch (e) {} });
+				try { if (modelState) modelState.dispose(); } catch (e) {}
+				try { if (modelSum) modelSum.dispose(); } catch (e) {}
 			}
 		}
 
 		// ==================== 15个预测模型 ====================
 		function calcLSTM(d) {
-			if (globalTFJSPredictions) {
+			if (!isHistoricalBacktestMode && globalTFJSPredictions) {
 				const s = {};
 				STATES.forEach(x => s[x] = globalTFJSPredictions[x] || 0.25);
 				return normalizeScores(s);
@@ -764,7 +962,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		function calcLSTM_Sum(d) {
 			let s = {};
 			STATES.forEach(x => s[x] = 1);
-			if (globalSumPredictions !== null && globalSumPredictions > 0) {
+			if (!isHistoricalBacktestMode && globalSumPredictions !== null && globalSumPredictions > 0) {
 				const predSum = Math.round(globalSumPredictions);
 				const predState = getState(Math.max(0, Math.min(27, predSum)));
 				s[predState] += 2.5;
@@ -845,22 +1043,26 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			let s = {};
 			STATES.forEach(x => s[x] = 1);
 			if (!d || d.length < 10) return normalizeScores(s);
-			let total = d.length;
-			let prior = {};
-			STATES.forEach(x => prior[x] = Math.max(0.05, d.filter(p => p.state === x).length / total));
 			const lastState = d[d.length - 1].state;
-			let conditional = {};
-			STATES.forEach(x => {
-				let givenXCount = 0, matchCount = 0;
-				for (let i = 0; i < d.length - 1; i++) {
-					if (d[i].state === x) {
-						givenXCount++;
-						if (d[i + 1].state === lastState) matchCount++;
-					}
-				}
-				conditional[x] = givenXCount === 0 ? 0.25 : Math.max(0.05, matchCount / givenXCount);
+			const transitionCounts = {};
+			const priorCounts = {};
+			STATES.forEach(x => { transitionCounts[x] = 1; priorCounts[x] = 1; });
+			let transitionTotal = STATES.length;
+			let priorTotal = STATES.length;
+			d.forEach(item => {
+				if (STATES.includes(item.state)) { priorCounts[item.state]++; priorTotal++; }
 			});
-			STATES.forEach(x => s[x] = prior[x] * (conditional[x] + 0.15));
+			for (let i = 0; i < d.length - 1; i++) {
+				if (d[i].state === lastState && STATES.includes(d[i + 1].state)) {
+					transitionCounts[d[i + 1].state]++;
+					transitionTotal++;
+				}
+			}
+			STATES.forEach(x => {
+				const transitionProb = transitionCounts[x] / transitionTotal;
+				const priorProb = priorCounts[x] / priorTotal;
+				s[x] = transitionProb * 0.80 + priorProb * 0.20;
+			});
 			return normalizeScores(s);
 		}
 
@@ -1087,36 +1289,101 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 
 		// 模型列表使用新冷热函数
 		const models = [
-			{ name: 'LSTM', func: calcLSTM, disp: 'LSTM 深度神经时序', c: '#ff2d55' },
-			{ name: 'LSTM_Sum', func: calcLSTM_Sum, disp: 'LSTM 和值预测器', c: '#ff6b6b' },
-			{ name: 'Cycle', func: calcCycle, disp: '多周期共振检测', c: '#00b894' },
-			{ name: 'Volatility', func: calcVolatility, disp: '波动率均值回归', c: '#ffd700' },
-			{ name: 'Markov', func: calcMarkov, disp: '高阶马尔可夫链', c: '#0984e3' },
-			{ name: 'Bayesian', func: calcBayesian, disp: '贝叶斯条件概率', c: '#a29bfe' },
-			{ name: 'Holt', func: calcHolt, disp: 'Holt-Winters平滑', c: '#fd79a8' },
-			{ name: 'GBoost', func: calcGradientBoost, disp: '梯度提升残差树', c: '#e17055' },
-			{ name: 'KNN', func: calcKNN, disp: '加权K近邻匹配', c: '#00cec9' },
-			{ name: 'Kelly', func: calcKelly, disp: '凯利最优分配', c: '#6c5ce7' },
-			{ name: 'Spectrum', func: calcSpectrum, disp: '频谱周期共振', c: '#fab1a0' },
-			{ name: 'Trend', func: calcTrend, disp: '趋势线性回归', c: '#55efc4' },
-			{ name: 'HotCold', func: calcAdvancedHotColdOmission, disp: '冷热遗漏综合分析', c: '#ffeaa7' },
-			{ name: 'SumRange', func: calcSumRange, disp: '和值聚类探测', c: '#dfe6e9' },
-			{ name: 'PatternMatch', func: calcPatternMatch, disp: '形态模式识别', c: '#74b9ff' },
+			{ name: 'LSTM', func: calcLSTM, disp: 'LSTM 深度神经时序', c: '#ff2d55', group: 'neural' },
+			{ name: 'LSTM_Sum', func: calcLSTM_Sum, disp: 'LSTM 和值预测器', c: '#ff6b6b', group: 'neural' },
+			{ name: 'Cycle', func: calcCycle, disp: '多周期共振检测', c: '#00b894', group: 'pattern' },
+			{ name: 'Volatility', func: calcVolatility, disp: '波动率均值回归', c: '#ffd700', group: 'trend' },
+			{ name: 'Markov', func: calcMarkov, disp: '高阶马尔可夫链', c: '#0984e3', group: 'transition' },
+			{ name: 'Bayesian', func: calcBayesian, disp: '贝叶斯条件概率', c: '#a29bfe', group: 'transition' },
+			{ name: 'Holt', func: calcHolt, disp: 'Holt-Winters平滑', c: '#fd79a8', group: 'trend' },
+			{ name: 'GBoost', func: calcGradientBoost, disp: '梯度提升残差树', c: '#e17055', group: 'trend' },
+			{ name: 'KNN', func: calcKNN, disp: '加权K近邻匹配', c: '#00cec9', group: 'pattern' },
+			{ name: 'Kelly', func: calcKelly, disp: '凯利最优分配', c: '#6c5ce7', group: 'other' },
+			{ name: 'Spectrum', func: calcSpectrum, disp: '频谱周期共振', c: '#fab1a0', group: 'pattern' },
+			{ name: 'Trend', func: calcTrend, disp: '趋势线性回归', c: '#55efc4', group: 'trend' },
+			{ name: 'HotCold', func: calcAdvancedHotColdOmission, disp: '冷热遗漏综合分析', c: '#ffeaa7', group: 'other' },
+			{ name: 'SumRange', func: calcSumRange, disp: '和值聚类探测', c: '#dfe6e9', group: 'trend' },
+			{ name: 'PatternMatch', func: calcPatternMatch, disp: '形态模式识别', c: '#74b9ff', group: 'pattern' },
 		];
 
+		const MODEL_GROUP_CAPS = Object.freeze({
+			neural: 0.28,
+			trend: 0.30,
+			pattern: 0.25,
+			transition: 0.22,
+			other: 0.15
+		});
+
+		function normalizeWeightMap(input) {
+			const out = {};
+			let total = 0;
+			models.forEach(m => {
+				const value = parseFloat(input?.[m.name]);
+				out[m.name] = Number.isFinite(value) && value > 0 ? value : 0;
+				total += out[m.name];
+			});
+			if (total <= 0) {
+				models.forEach(m => out[m.name] = 1 / models.length);
+				return out;
+			}
+			models.forEach(m => out[m.name] /= total);
+			return out;
+		}
+
+		function applyModelGroupCaps(input) {
+			const base = normalizeWeightMap(input);
+			const groups = {};
+			models.forEach(m => {
+				const group = m.group || 'other';
+				if (!groups[group]) groups[group] = [];
+				groups[group].push(m.name);
+			});
+			const baseMass = {}, allocation = {};
+			Object.entries(groups).forEach(([group, names]) => {
+				baseMass[group] = names.reduce((sum, name) => sum + base[name], 0);
+				allocation[group] = Math.min(baseMass[group], MODEL_GROUP_CAPS[group] ?? 1);
+			});
+			let left = Math.max(0, 1 - Object.values(allocation).reduce((a, b) => a + b, 0));
+			for (let pass = 0; pass < 12 && left > 1e-10; pass++) {
+				const eligible = Object.keys(groups).filter(group => (MODEL_GROUP_CAPS[group] ?? 1) - allocation[group] > 1e-10);
+				if (!eligible.length) break;
+				const priorityTotal = eligible.reduce((sum, group) => sum + Math.max(baseMass[group], 0.001), 0);
+				let used = 0;
+				eligible.forEach(group => {
+					const headroom = (MODEL_GROUP_CAPS[group] ?? 1) - allocation[group];
+					const share = left * Math.max(baseMass[group], 0.001) / priorityTotal;
+					const add = Math.min(headroom, share);
+					allocation[group] += add;
+					used += add;
+				});
+				if (used <= 1e-12) break;
+				left -= used;
+			}
+			const capped = {};
+			Object.entries(groups).forEach(([group, names]) => {
+				const groupBase = baseMass[group];
+				names.forEach(name => {
+					capped[name] = groupBase > 0 ? allocation[group] * base[name] / groupBase : allocation[group] / names.length;
+				});
+			});
+			return normalizeWeightMap(capped);
+		}
+
+		weights = applyModelGroupCaps(weights);
 
 		// ==================== 模型动态淘汰 + 同向一致性判断 ====================
 		// 说明：模型近期表现只读取已锁定并结算的预测快照，避免用开奖后的历史数据重新计算旧预测。
 		const MODEL_DYNAMIC_FILTER = {
 			enabled: true,
-			window: 30,
-			minSample: 18,
-			weakHitRate: 0.45,
-			strongHitRate: 0.55,
-			freezeHitRate: 0.35,
-			weakMultiplier: 0.55,
-			strongMultiplier: 1.25,
-			freezeMultiplier: 0.05,
+			window: 100,
+			minSample: 60,
+			weakHitRate: 0.47,
+			strongHitRate: 0.56,
+			freezeHitRate: 0.40,
+			weakMultiplier: 0.75,
+			strongMultiplier: 1.15,
+			freezeMultiplier: 0.35,
+			emaAlpha: 0.20,
 			minAgreement: 8
 		};
 		let modelDynamicPerfCache = { key: '', data: null };
@@ -1149,17 +1416,36 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		}
 
 		function getLockedPredictionBacktestRecords() {
+			const byPeriod = new Map();
+			try {
+				normalizePredictionStats();
+				(predictionStats.snapshots || []).forEach(snap => {
+					if (!snap || !snap.settled || !STATES.includes(snap.actualState) || !Array.isArray(snap.modelChoices) || !snap.modelChoices.length) return;
+					byPeriod.set(String(snap.period), {
+						period: String(snap.period),
+						actualState: snap.actualState,
+						modelChoices: snap.modelChoices.map(sanitizeModelChoice).filter(Boolean),
+						lockedAt: snap.createdAt || 0,
+						settledAt: snap.settledAt || 0
+					});
+				});
+			} catch (e) {}
 			const source = getLockedBacktestSource();
 			const logs = Array.isArray(source?.logs) ? source.logs : [];
-			return logs
-				.filter(log => log && Array.isArray(log.modelChoices) && log.modelChoices.length > 0 && getActualStateFromLockedLog(log))
-				.map(log => ({
-					period: String(log.period || ''),
-					actualState: getActualStateFromLockedLog(log),
-					modelChoices: log.modelChoices,
+			logs.forEach(log => {
+				const actualState = getActualStateFromLockedLog(log);
+				if (!log || !actualState || !Array.isArray(log.modelChoices) || !log.modelChoices.length) return;
+				const key = String(log.period || '');
+				if (!key || byPeriod.has(key)) return;
+				byPeriod.set(key, {
+					period: key,
+					actualState,
+					modelChoices: log.modelChoices.map(sanitizeModelChoice).filter(Boolean),
 					lockedAt: log.lockedAt || 0,
 					settledAt: log.settledAt || 0
-				}));
+				});
+			});
+			return Array.from(byPeriod.values()).sort((a, b) => String(a.period).localeCompare(String(b.period), undefined, { numeric: true }));
 		}
 
 		function getRecentModelPerformanceStats(dataSlice) {
@@ -1167,49 +1453,49 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			const emptyStats = { multipliers: {}, details: {}, summary: '' };
 			models.forEach(m => {
 				emptyStats.multipliers[m.name] = 1;
-				emptyStats.details[m.name] = { hitRate: null, samples: 0, status: 'normal', multiplier: 1 };
+				emptyStats.details[m.name] = { hitRate: null, top1Rate: null, probabilityQuality: null, samples: 0, status: 'normal', multiplier: 1 };
 			});
 			if (!cfg.enabled) return emptyStats;
 
 			const records = getLockedPredictionBacktestRecords().slice(-cfg.window);
 			const lastPeriodKey = String(dataSlice?.[dataSlice.length - 1]?.period || '');
 			const lastLockedKey = records.length ? `${records.length}|${records[records.length - 1].period}|${records[records.length - 1].settledAt || records[records.length - 1].lockedAt || 0}` : 'none';
-			const cacheKey = `locked|${lastPeriodKey}|${lastLockedKey}|${cfg.window}|${cfg.minSample}`;
+			const cacheKey = `locked-v42|${lastPeriodKey}|${lastLockedKey}|${cfg.window}|${cfg.minSample}`;
 			if (modelDynamicPerfCache.key === cacheKey && modelDynamicPerfCache.data) return modelDynamicPerfCache.data;
 
-			let stats = { multipliers: {}, details: {}, summary: '' };
+			const stats = { multipliers: {}, details: {}, summary: '' };
 			models.forEach(m => {
-				let hits = 0;
-				let samples = 0;
+				let top2Hits = 0, top1Hits = 0, samples = 0, qualitySum = 0, qualitySamples = 0;
 				records.forEach(rec => {
 					const choice = (rec.modelChoices || []).find(x => x && x.model === m.name);
-					if (!choice || !rec.actualState) return;
-					const lockedTop = Array.isArray(choice.topList) && choice.topList.length ? choice.topList : [choice.choice].filter(Boolean);
-					if (lockedTop.includes(rec.actualState)) hits++;
+					const evaluation = evaluateModelChoice(choice, rec.actualState);
+					if (!evaluation) return;
+					top2Hits += evaluation.top2Hit;
+					top1Hits += evaluation.top1Hit;
+					if (evaluation.probabilityQuality !== null) { qualitySum += evaluation.probabilityQuality; qualitySamples++; }
 					samples++;
 				});
-				let hitRate = samples > 0 ? hits / samples : null;
-				let multiplier = 1;
+				const hitRate = samples ? top2Hits / samples : null;
+				const top1Rate = samples ? top1Hits / samples : null;
+				const probabilityQuality = qualitySamples ? qualitySum / qualitySamples : null;
+				let rawMultiplier = 1;
 				let status = 'normal';
 				if (samples >= cfg.minSample && hitRate !== null) {
-					if (hitRate < cfg.freezeHitRate) {
-						multiplier = cfg.freezeMultiplier;
-						status = 'frozen';
-					} else if (hitRate < cfg.weakHitRate) {
-						multiplier = cfg.weakMultiplier;
-						status = 'weak';
-					} else if (hitRate > cfg.strongHitRate) {
-						multiplier = cfg.strongMultiplier;
-						status = 'strong';
-					}
+					if (hitRate < cfg.freezeHitRate) { rawMultiplier = cfg.freezeMultiplier; status = 'frozen'; }
+					else if (hitRate < cfg.weakHitRate) { rawMultiplier = cfg.weakMultiplier; status = 'weak'; }
+					else if (hitRate > cfg.strongHitRate) { rawMultiplier = cfg.strongMultiplier; status = 'strong'; }
 				}
+				const previous = Number.isFinite(parseFloat(modelRecentPerformance[m.name]?.multiplier)) ? parseFloat(modelRecentPerformance[m.name].multiplier) : 1;
+				const multiplier = previous * (1 - cfg.emaAlpha) + rawMultiplier * cfg.emaAlpha;
 				stats.multipliers[m.name] = multiplier;
-				stats.details[m.name] = { hitRate, samples, status, multiplier };
+				stats.details[m.name] = { hitRate, top1Rate, probabilityQuality, samples, status, multiplier, rawMultiplier };
+				modelRecentPerformance[m.name] = Object.assign({}, modelRecentPerformance[m.name] || {}, stats.details[m.name]);
 			});
+			try { localStorage.setItem(MODEL_PERF_STATE_KEY, JSON.stringify(modelRecentPerformance)); } catch (e) {}
 			const frozenCount = Object.values(stats.details).filter(x => x.status === 'frozen').length;
 			const weakCount = Object.values(stats.details).filter(x => x.status === 'weak').length;
 			const strongCount = Object.values(stats.details).filter(x => x.status === 'strong').length;
-			stats.summary = records.length < cfg.minSample ? `锁单样本${records.length}/${cfg.minSample}` : `锁单回测｜强势${strongCount}｜降权${weakCount}｜冻结${frozenCount}`;
+			stats.summary = records.length < cfg.minSample ? `锁单样本${records.length}/${cfg.minSample}` : `Top2锁单｜强势${strongCount}｜降权${weakCount}｜冻结${frozenCount}`;
 			modelDynamicPerfCache = { key: cacheKey, data: stats };
 			return stats;
 		}
@@ -1222,12 +1508,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				const mul = stats?.multipliers?.[m.name] ?? 1;
 				adjusted[m.name] = base * mul;
 			});
-			let total = Object.values(adjusted).reduce((a, b) => a + b, 0);
-			if (total <= 0) {
-				models.forEach(m => adjusted[m.name] = 1 / models.length);
-			} else {
-				models.forEach(m => adjusted[m.name] /= total);
-			}
+			adjusted = applyModelGroupCaps(adjusted);
 			return { weights: adjusted, stats };
 		}
 
@@ -1265,11 +1546,11 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 					}
 				});
 				const topListForModel = getTopStatesFromScores(sc, 2);
-				modelChoices.push({ model: m.name, choice: bestModelChoice, topList: topListForModel, weight: w });
+				modelChoices.push({ model: m.name, choice: bestModelChoice, topList: topListForModel, weight: w, scores: Object.fromEntries(STATES.map(state => [state, sc[state] || 0])) });
 				votes[bestModelChoice] += w;
 			});
 
-			if (globalSumPredictions !== null && globalSumPredictions > 0 && globalSumPredictions <= 27) {
+			if (!isHistoricalBacktestMode && globalSumPredictions !== null && globalSumPredictions > 0 && globalSumPredictions <= 27) {
 				const sumState = getState(Math.round(globalSumPredictions));
 				final[sumState] += 0.3;
 				votes[sumState] += 0.1; // 和值模型独立加票
@@ -1367,13 +1648,15 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			const total = list.length;
 			const hits = list.filter(s => !!s.hit).length;
 			const hitRate = total ? hits / total : 0;
-			const effective = total ? hitRate - RANDOM_BASELINE_RATE : 0;
+			const baselineRate = total ? list.reduce((sum, s) => sum + getComboBaseline(s.topList), 0) / total : DEFAULT_RANDOM_BASELINE_RATE;
+			const effective = total ? hitRate - baselineRate : 0;
 			const actionList = list.filter(s => !!s.actionable);
 			const actionTotal = actionList.length;
 			const actionHits = actionList.filter(s => !!s.hit).length;
 			const actionRate = actionTotal ? actionHits / actionTotal : 0;
-			const actionEffective = actionTotal ? actionRate - RANDOM_BASELINE_RATE : 0;
-			return { total, hits, hitRate, effective, actionTotal, actionHits, actionRate, actionEffective };
+			const actionBaselineRate = actionTotal ? actionList.reduce((sum, s) => sum + getComboBaseline(s.topList), 0) / actionTotal : DEFAULT_RANDOM_BASELINE_RATE;
+			const actionEffective = actionTotal ? actionRate - actionBaselineRate : 0;
+			return { total, hits, hitRate, baselineRate, effective, actionTotal, actionHits, actionRate, actionBaselineRate, actionEffective };
 		}
 
 		function getWindowFairComparisonRecords(windowSize, limit = 160) {
@@ -1398,7 +1681,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		}
 
 		function getWindowLockedStats(windowSize, limit = 160) {
-			// v4.1.3：多窗口公平统计。每期保存所有窗口预测，开奖后所有窗口同步结算。
+			// v4.2.0：多窗口公平统计。每期保存所有窗口预测，开奖后所有窗口同步结算。
 			// 旧版只统计被选中窗口，存在选择偏差；这里不再用旧版 selected-window 样本给窗口打分。
 			const fairRecords = getWindowFairComparisonRecords(windowSize, limit);
 			return computeSnapshotStats(fairRecords);
@@ -1499,7 +1782,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				let actualItem = historyData[i];
 				if (context.length < 4) continue;
 				let seq = context.slice(-4).map(x => x.state).join(',');
-				let rawPred = getComboPredictionRaw(context, true);
+				let rawPred = runInHistoricalBacktest(() => getComboPredictionRaw(context, true));
 				if (!advRegistry[seq]) advRegistry[seq] = { fails: 0, total: 0, processed: {} };
 				if (!advRegistry[seq].processed) advRegistry[seq].processed = {};
 				if (advRegistry[seq].processed[actualItem.period]) continue;
@@ -1529,12 +1812,16 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				btn.innerText = '🙈 隐藏量化投注明细';
 			} else {
 				box.style.display = 'none';
-				btn.innerText = '👁️ 显示量化投注明细 (点此展开/隐藏)';
+				btn.innerText = '👁️ 显示/隐藏投注明细';
 			}
 		}
 
 		const SIM_STORAGE_KEY = 'jnd28_sim_stats_v4';
-		const SIM_STRATEGY_VERSION = 'aggressive_chase_v2_model_consensus';
+		const SIM_STRATEGY_VERSION = 'fixed_30_ladder_v1';
+		const SIM_BLOCK_BET_POLICY_VERSION = 'bet_on_adv_and_disagreement_v1';
+		const SIM_CONFIDENCE_BET_POLICY_VERSION = 'bet_below_30_percent_v1';
+		const SIM_BASE_UNIT = 30;
+		const SIM_BET_LADDER = [1, 1, 2, 4, 7, 21, 39, 61, 109, 197, 354, 637];
 
 		function clampNum(v, min, max) {
 			return Math.max(min, Math.min(max, v));
@@ -1557,21 +1844,24 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			// 第五项优化：只用真实锁单快照做模型回测，不再用开奖后的历史数据重新计算旧预测。
 			simStats.logs.forEach(log => {
 				if (log && Array.isArray(log.modelChoices)) {
-					log.modelChoices = log.modelChoices.map(x => ({
-						model: x.model,
-						choice: x.choice,
-						topList: Array.isArray(x.topList) ? x.topList.slice(0, 2) : (x.choice ? [x.choice] : []),
-						weight: Number.isFinite(parseFloat(x.weight)) ? parseFloat(x.weight) : 0
-					}));
+					log.modelChoices = log.modelChoices.map(sanitizeModelChoice).filter(Boolean);
 				}
 			});
+			const storedStrategyVersion = simStats.strategyVersion ? String(simStats.strategyVersion) : '';
 			simStats.winStreak = parseInt(simStats.winStreak || 0, 10) || 0;
-			simStats.lossStreak = parseInt(simStats.lossStreak || 0, 10) || 0;
-			simStats.pauseRounds = Math.max(0, parseInt(simStats.pauseRounds || 0, 10) || 0);
+			simStats.lossStreak = Math.max(0, parseInt(simStats.lossStreak || 0, 10) || 0);
+			simStats.ladderStep = Math.max(0, parseInt(simStats.ladderStep ?? simStats.lossStreak ?? 0, 10) || 0);
+			// 切换到固定30元倍投策略时，仅重置倍投进度；保留账户余额和既有历史流水。
+			if (storedStrategyVersion && storedStrategyVersion !== SIM_STRATEGY_VERSION) {
+				simStats.winStreak = 0;
+				simStats.lossStreak = 0;
+				simStats.ladderStep = 0;
+			}
+			simStats.pauseRounds = 0;
 			simStats.peakBalance = n(simStats.peakBalance, Math.max(simStats.initBalance, simStats.balance));
 			if (simStats.peakBalance < simStats.balance) simStats.peakBalance = simStats.balance;
 			simStats.lastDrawdownPausePeak = n(simStats.lastDrawdownPausePeak, 0);
-			simStats.strategyVersion = simStats.strategyVersion || SIM_STRATEGY_VERSION;
+			simStats.strategyVersion = SIM_STRATEGY_VERSION;
 			if (!simStats.pendingBet || typeof simStats.pendingBet !== 'object' || !simStats.pendingBet.period) {
 				simStats.pendingBet = null;
 			} else {
@@ -1593,21 +1883,12 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				.trim();
 			if (simStats.pendingBet && simStats.pendingBet.reason) simStats.pendingBet.reason = cleanReasonText(simStats.pendingBet.reason);
 			simStats.logs.forEach(log => { if (log && log.reason) log.reason = cleanReasonText(log.reason); });
-			// 新规则：回撤保护只降仓，不再触发停注；停注只允许由连亏5期触发。
-			// 因此清理旧版本遗留的 drawdown30/risk 风控暂停状态，避免打开新版后继续“才亏1期就暂停”。
-			if (simStats.pauseRounds > 0 && simStats.pauseMode !== 'loss5') {
-				simStats.pauseRounds = 0;
-				simStats.pauseMode = '';
-				simStats.pauseTotalRounds = 0;
-				simStats.pauseUsedRounds = 0;
-				simStats.pauseStartAfterPeriod = '';
-			}
-			if (simStats.pauseRounds <= 0 && simStats.pauseMode === 'loss5') {
-				simStats.pauseMode = '';
-				simStats.pauseTotalRounds = 0;
-				simStats.pauseUsedRounds = 0;
-				simStats.pauseStartAfterPeriod = '';
-			}
+			// 固定倍投策略不暂停：只有真实下注未命中才进入下一档，命中立即回到第一档。
+			simStats.pauseRounds = 0;
+			simStats.pauseMode = '';
+			simStats.pauseTotalRounds = 0;
+			simStats.pauseUsedRounds = 0;
+			simStats.pauseStartAfterPeriod = '';
 			return simStats;
 		}
 
@@ -1619,18 +1900,11 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		function getAggressiveStableProfile() {
 			normalizeSimulationStats();
 			return {
-				mode: 'aggressive_chase',
+				mode: 'fixed_30_ladder',
 				minConfidence: 0.30,
-				// 进攻型追注：基础总仓按当前余额 8% 计算，之后根据连挂/连中倍数放大。
-				baseRatio: 0.08,
-				maxTotalRatio: 0.30,
-				lossMultipliers: { 0: 1.00, 1: 1.50, 2: 2.00, 3: 2.80, 4: 3.60 },
-				winMultipliers: { 0: 1.00, 1: 1.20, 2: 1.40, 3: 1.60, 4: 1.80, 5: 2.00 },
-				maxWinStreakLevel: 5,
-				// 连挂第 5 期亏损正常结算；从下一期开始停注 4 期。
-				stopAfterLossStreak: 5,
-				pauseRoundsAfterLoss5: 4,
-				minBetPerState: 1
+				baseUnit: SIM_BASE_UNIT,
+				ladder: SIM_BET_LADDER.slice(),
+				minBetPerState: SIM_BASE_UNIT
 			};
 		}
 
@@ -1641,34 +1915,41 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		}
 
 		function getStageInfo(profile) {
-			return { key: 'chase', label: '进攻追注策略', ratio: profile.baseRatio, progress: getTargetProgress() };
+			const missCount = Math.max(0, parseInt(simStats.lossStreak || 0, 10) || 0);
+			const index = Math.min(missCount, profile.ladder.length - 1);
+			const multiplier = profile.ladder[index];
+			const capped = missCount >= profile.ladder.length;
+			return {
+				key: 'fixed_ladder',
+				label: `固定30元倍投第${index + 1}档${capped ? '（封顶维持）' : ''}`,
+				ratio: 0,
+				progress: getTargetProgress(),
+				index,
+				multiplier
+			};
 		}
 
 		function getStreakMultiplier(profile) {
-			const lossLevel = Math.min(Math.max(parseInt(simStats.lossStreak || 0, 10) || 0, 0), 4);
-			const winLevelRaw = Math.max(parseInt(simStats.winStreak || 0, 10) || 0, 0);
-			if (lossLevel > 0) {
-				const m = profile.lossMultipliers[lossLevel] || 1;
-				return { multiplier: m, label: `连挂${lossLevel}期追注 ×${m.toFixed(2)}` };
-			}
-			if (winLevelRaw > 0) {
-				const level = Math.min(winLevelRaw, profile.maxWinStreakLevel || 5);
-				const m = profile.winMultipliers[level] || 1;
-				const cappedText = winLevelRaw > (profile.maxWinStreakLevel || 5) ? '，已达加注封顶' : '';
-				return { multiplier: m, label: `连中${winLevelRaw}期加注${cappedText} ×${m.toFixed(2)}` };
-			}
-			return { multiplier: 1, label: '基础追注档 ×1.00' };
+			const missCount = Math.max(0, parseInt(simStats.lossStreak || 0, 10) || 0);
+			const index = Math.min(missCount, profile.ladder.length - 1);
+			const multiplier = profile.ladder[index];
+			const cappedText = missCount >= profile.ladder.length ? '，已到637倍封顶并维持' : '';
+			return {
+				multiplier,
+				index,
+				label: `未中${missCount}期｜当前第${index + 1}档 ×${multiplier}${cappedText}`
+			};
 		}
 
 		function getDrawdownInfo(profile) {
 			const peak = Math.max(simStats.peakBalance || simStats.balance, simStats.balance, 1);
 			const rate = clampNum((peak - simStats.balance) / peak, 0, 1);
-			// 新追注策略不再按回撤改变下注档位；停注只由连挂5期触发。
+			// 固定倍投金额不随余额、回撤或连赢变化。
 			return { rate, multiplier: 1, overrideRatio: null, label: '' };
 		}
 
 		function refreshRiskPauseState(profile) {
-			// 追注版不使用回撤停注/回撤降仓；真正停注只由“连挂5期后，从下一期开始停注4期”触发。
+			// 固定倍投策略不停注；未命中进入下一档，命中回到第一档。
 			return getDrawdownInfo(profile);
 		}
 
@@ -1683,41 +1964,16 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			if (isTargetReached) {
 				return { status: 'target_reached', bet1: 0, bet2: 0, betAmount: 0, profile, stage, streak, drawdown, reason: '目标达成停注' };
 			}
-			if (simStats.pauseRounds > 0) {
-				if (simStats.pauseMode !== 'loss5') {
-					simStats.pauseRounds = 0;
-					simStats.pauseMode = '';
-					simStats.pauseTotalRounds = 0;
-					simStats.pauseUsedRounds = 0;
-					simStats.pauseStartAfterPeriod = '';
-				} else {
-					const total = simStats.pauseTotalRounds || profile.pauseRoundsAfterLoss5 || simStats.pauseRounds;
-					const index = Math.min(total, (simStats.pauseUsedRounds || 0) + 1);
-					const pauseReason = `连挂5期后停注，第${index}/${total}期`;
-					simStats.pauseUsedRounds = index;
-					simStats.pauseRounds = Math.max(0, simStats.pauseRounds - 1);
-					return { status: 'paused', bet1: 0, bet2: 0, betAmount: 0, profile, stage, streak, drawdown, reason: pauseReason, pauseMode: simStats.pauseMode, pauseIndex: simStats.pauseUsedRounds || 0, pauseTotal: simStats.pauseTotalRounds || 0 };
-				}
+			if (!nextPred) {
+				return { status: 'watch', bet1: 0, bet2: 0, betAmount: 0, profile, stage, streak, drawdown, reason: '暂无有效预测，空仓' };
 			}
-			if (!nextPred || nextPred.isAdvBlock) {
-				return { status: 'watch', bet1: 0, bet2: 0, betAmount: 0, profile, stage, streak, drawdown, reason: '对抗防御触发，空仓' };
-			}
-			if (nextPred.isAgreementBlock) {
-				return { status: 'watch', bet1: 0, bet2: 0, betAmount: 0, profile, stage, streak, drawdown, reason: `模型一致性不足，空仓(${nextPred.modelAgreement || 0}/${nextPred.modelAgreementTotal || models.length})` };
-			}
-			if ((nextPred.confidence || 0) < profile.minConfidence) {
-				return { status: 'watch', bet1: 0, bet2: 0, betAmount: 0, profile, stage, streak, drawdown, reason: '置信度不足，空仓' };
-			}
+			// 模拟投注不再因对抗防御、模型分歧或置信度不足30%停注：
+			// 只要存在有效预测，就使用当期推荐的两个组合，按当前倍投档位正常锁单。
+			const isLowConfidence = (nextPred.confidence || 0) < profile.minConfidence;
 
-			const rawRatio = profile.baseRatio * streak.multiplier;
-			let finalRatio = Math.min(rawRatio, profile.maxTotalRatio);
-			finalRatio = Math.max(0, finalRatio);
-			let totalBetAmount = Math.floor(simStats.balance * finalRatio);
-			let betPerState = Math.floor(totalBetAmount / 2);
-			if (betPerState < profile.minBetPerState) {
-				return { status: 'watch', bet1: 0, bet2: 0, betAmount: 0, profile, stage, streak, drawdown, ratio: finalRatio, reason: '余额或比例过低，空仓' };
-			}
-			totalBetAmount = betPerState * 2;
+			const betPerState = profile.baseUnit * streak.multiplier;
+			const totalBetAmount = betPerState * 2;
+			const finalRatio = simStats.balance > 0 ? totalBetAmount / simStats.balance : 0;
 			return {
 				status: 'locked',
 				bet1: betPerState,
@@ -1728,7 +1984,16 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				streak,
 				drawdown,
 				ratio: finalRatio,
-				reason: [stage.label, streak.label, `总仓${(finalRatio * 100).toFixed(1)}%`].filter(Boolean).join(' · ')
+				ladderStep: streak.index,
+				ladderMultiplier: streak.multiplier,
+				reason: [
+					nextPred.isAdvBlock ? '对抗防御照常下注' : '',
+					nextPred.isAgreementBlock ? `模型分歧照常下注(${nextPred.modelAgreement || 0}/${nextPred.modelAgreementTotal || models.length})` : '',
+					isLowConfidence ? `置信度不足30%照常下注(${((nextPred.confidence || 0) * 100).toFixed(1)}%)` : '',
+					stage.label,
+					streak.label,
+					`每项￥${betPerState}`
+				].filter(Boolean).join(' · ')
 			};
 		}
 
@@ -1771,6 +2036,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				peakBalance: initVal,
 				winStreak: 0,
 				lossStreak: 0,
+				ladderStep: 0,
 				pauseRounds: 0,
 				pauseMode: '',
 				lastDrawdownPausePeak: 0,
@@ -1791,7 +2057,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		function updateSimulationUI() {
 			normalizeSimulationStats();
 			let targetText = simStats.targetBalance > 0 ? `<br><span style="font-size:10px;color:#888;font-weight:normal;">(目标: ￥${simStats.targetBalance.toFixed(2)})</span>` : '';
-			let riskText = `<br><span style="font-size:9px;color:#777;font-weight:normal;">峰值￥${simStats.peakBalance.toFixed(2)}｜连赢${simStats.winStreak}｜连亏${simStats.lossStreak}${simStats.pauseRounds > 0 ? `｜暂停${simStats.pauseRounds}` : ''}</span>`;
+			let riskText = `<br><span style="font-size:9px;color:#777;font-weight:normal;">峰值￥${simStats.peakBalance.toFixed(2)}｜倍投第${Math.min((simStats.ladderStep || 0) + 1, SIM_BET_LADDER.length)}档｜未中${simStats.lossStreak}期</span>`;
 			if (simStats.targetBalance > 0 && simStats.balance >= simStats.targetBalance) {
 				document.getElementById('sim-current-balance').innerHTML = `￥${simStats.balance.toFixed(2)}${targetText}<br><span style="font-size:11px;color:#00b894;font-weight:900;">🏆 目标达成</span>${riskText}`;
 			} else {
@@ -1835,10 +2101,19 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 
 		function shouldRefreshPendingAfterStrategyUpgrade() {
 			const bet = simStats.pendingBet;
-			if (!bet || !bet.period || bet.strategy === SIM_STRATEGY_VERSION) return false;
+			if (!bet || !bet.period) return false;
 			if (findHistoryByPeriod(bet.period) || isPeriodExpired(bet.period)) return false;
-			// 策略已切换为“连挂追注 + 连中加注”，当前未开奖旧锁单重建一次；已结算历史不回算、不漂移。
-			return true;
+			// 旧投注策略的未开奖锁单需要重建。
+			if (bet.strategy !== SIM_STRATEGY_VERSION) return true;
+			// 若旧版因“对抗防御/模型分歧”或“置信度不足30%”生成了空仓锁单，
+			// 则只重建这一条未开奖记录；不重置倍投档位。
+			const legacyBlockedWatch = bet.status === 'watch' && (bet.isAdvBlock || bet.isAgreementBlock);
+			if (legacyBlockedWatch && bet.blockBetPolicy !== SIM_BLOCK_BET_POLICY_VERSION) return true;
+			const legacyLowConfidenceWatch = bet.status === 'watch'
+				&& !bet.isAdvBlock
+				&& !bet.isAgreementBlock
+				&& (parseFloat(bet.confidence || 0) < 0.30);
+			return legacyLowConfidenceWatch && bet.confidenceBetPolicy !== SIM_CONFIDENCE_BET_POLICY_VERSION;
 		}
 
 		function ensurePendingBetForNextPeriod() {
@@ -1853,7 +2128,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 					settlePendingBetWithActual(actual);
 				} else if (!isPeriodExpired(simStats.pendingBet.period)) {
 					if (!shouldRefreshPendingAfterStrategyUpgrade()) return simStats.pendingBet;
-					console.warn('检测到旧版模拟投注锁单，已按追注策略重建当前未开奖锁单:', simStats.pendingBet.period);
+					console.warn('检测到旧版模拟投注锁单，已按固定30元倍投策略重建当前未开奖锁单:', simStats.pendingBet.period);
 					simStats.pendingBet = null;
 				} else {
 					// 数据源已经跳过该期，无法公平结算，清除过期锁单，防止界面卡死。
@@ -1866,7 +2141,10 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			const nextPred = getComboPrediction(historyData);
 			const plan = buildIndependentBetPlan(nextPred);
 			let comboTag = `${nextPred.state1}/${nextPred.state2}`;
-			if (plan.status === 'locked') comboTag = `追注策略 ${nextPred.state1}/${nextPred.state2}`;
+			if (plan.status === 'locked') {
+				const blockLabel = nextPred.isAdvBlock ? ' · 对抗防御照常下注' : (nextPred.isAgreementBlock ? ' · 模型分歧照常下注' : '');
+				comboTag = `固定30元倍投${blockLabel} ${nextPred.state1}/${nextPred.state2}`;
+			}
 			if (plan.status === 'target_reached') comboTag = '🛑 止盈锁定';
 			if (plan.status === 'paused') comboTag = '🛡 连亏停注';
 			if (plan.status === 'watch') comboTag = nextPred.isAdvBlock ? `🛑 对抗防御 (${nextPred.state1}/${nextPred.state2})` : (nextPred.isAgreementBlock ? `🛑 模型分歧 (${nextPred.state1}/${nextPred.state2})` : `🛑 空仓观望 (${nextPred.state1}/${nextPred.state2})`);
@@ -1891,20 +2169,19 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				lockedPredictionVersion: 'locked_backtest_v1',
 				predictionTopList: Array.isArray(nextPred.topList) ? nextPred.topList.slice(0, 2) : [nextPred.state1, nextPred.state2],
 				predictionCombo: nextPred.comboStr || `${nextPred.state1}/${nextPred.state2}`,
-				modelChoices: Array.isArray(nextPred.modelChoices) ? nextPred.modelChoices.map(x => ({
-					model: x.model,
-					choice: x.choice,
-					topList: Array.isArray(x.topList) ? x.topList.slice(0, 2) : (x.choice ? [x.choice] : []),
-					weight: Number.isFinite(parseFloat(x.weight)) ? parseFloat(x.weight) : 0
-				})) : [],
+				modelChoices: Array.isArray(nextPred.modelChoices) ? nextPred.modelChoices.map(sanitizeModelChoice).filter(Boolean) : [],
 				status: plan.status,
 				lockedAt: Date.now(),
 				balanceBase: simStats.balance,
 				odds1: ODDS_MAP[nextPred.state1] || 4.5,
 				odds2: ODDS_MAP[nextPred.state2] || 4.5,
 				strategy: SIM_STRATEGY_VERSION,
+				blockBetPolicy: SIM_BLOCK_BET_POLICY_VERSION,
+				confidenceBetPolicy: SIM_CONFIDENCE_BET_POLICY_VERSION,
 				stage: plan.stage ? plan.stage.label : '',
 				ratio: plan.ratio || 0,
+				ladderStep: plan.ladderStep ?? simStats.ladderStep ?? 0,
+				ladderMultiplier: plan.ladderMultiplier || 1,
 				riskReason: plan.reason || '',
 				drawdownRate: plan.drawdown ? plan.drawdown.rate : 0,
 				winStreak: simStats.winStreak,
@@ -1917,26 +2194,23 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			return simStats.pendingBet;
 		}
 
-		function applyPostSettleRiskState(netProfit, settledPeriod = '') {
-			const profile = getAggressiveStableProfile();
-			if (netProfit > 0) {
+		function applyPostSettleRiskState(isHit, netProfit, settledPeriod = '') {
+			if (isHit) {
+				// 仅普通命中才回到第1档；对子/豹子回本保护按未中奖处理并进入下一档。
 				simStats.winStreak++;
 				simStats.lossStreak = 0;
-			} else if (netProfit < 0) {
+				simStats.ladderStep = 0;
+			} else {
 				simStats.lossStreak++;
 				simStats.winStreak = 0;
-				if (simStats.lossStreak >= profile.stopAfterLossStreak && simStats.pauseRounds <= 0) {
-					// 第 5 期亏损仍然是正常结算；停注从下一期开始，连续停 4 期。
-					simStats.pauseRounds = profile.pauseRoundsAfterLoss5;
-					simStats.pauseTotalRounds = profile.pauseRoundsAfterLoss5;
-					simStats.pauseUsedRounds = 0;
-					simStats.pauseStartAfterPeriod = settledPeriod ? String(settledPeriod) : '';
-					simStats.pauseMode = 'loss5';
-				}
-			} else {
-				simStats.winStreak = 0;
-				simStats.lossStreak = 0;
+				// 第12档后继续维持637倍，直到命中后归零。
+				simStats.ladderStep = Math.min((simStats.ladderStep || 0) + 1, SIM_BET_LADDER.length - 1);
 			}
+			simStats.pauseRounds = 0;
+			simStats.pauseMode = '';
+			simStats.pauseTotalRounds = 0;
+			simStats.pauseUsedRounds = 0;
+			simStats.pauseStartAfterPeriod = '';
 			if (simStats.balance > simStats.peakBalance) {
 				simStats.peakBalance = simStats.balance;
 				simStats.lastDrawdownPausePeak = 0;
@@ -1961,13 +2235,17 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 					if (isSpecialDraw && !logComboTag.includes('回本保护') && actualItem.state !== bet.state1) logComboTag += ` (${bet.state2}回本保护)`;
 				}
 				const totalPayout = payout1 + payout2;
-				const isHit = (actualItem.state === bet.state1 || actualItem.state === bet.state2);
+				const predictionMatched = (actualItem.state === bet.state1 || actualItem.state === bet.state2);
+				const isProtectedReturn = isSpecialDraw && predictionMatched;
+				// 对子/豹子即使匹配推荐并触发回本保护，也不算中奖：不增加命中数，倍投进入下一档。
+				const isHit = predictionMatched && !isProtectedReturn;
+				if (isProtectedReturn && !logComboTag.includes('按未中')) logComboTag += ' · 按未中升档';
 				let netProfit = totalPayout - bet.betAmount;
 				if (Math.abs(netProfit) < 0.0001) netProfit = 0;
 				simStats.balance = simStats.balance + netProfit;
 				simStats.totalBets++;
 				if (isHit) simStats.winBets++;
-				applyPostSettleRiskState(netProfit, actualItem.period);
+				applyPostSettleRiskState(isHit, netProfit, actualItem.period);
 				simStats.logs.push({
 					period: actualItem.period,
 					combo: logComboTag,
@@ -1984,6 +2262,8 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 					status: bet.status,
 					strategy: bet.strategy || SIM_STRATEGY_VERSION,
 					stage: bet.stage || '',
+					ladderStep: bet.ladderStep ?? 0,
+					ladderMultiplier: bet.ladderMultiplier || 1,
 					ratio: bet.ratio || 0,
 					windowSize: bet.windowSize || null,
 					riskReason: bet.riskReason || '',
@@ -1993,15 +2273,12 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				pauseIndex: bet.pauseIndex || 0,
 				pauseTotal: bet.pauseTotal || 0,
 						actualState: actualItem.state,
+						isHit: isHit,
+						isProtectedReturn: isProtectedReturn,
 						lockedPredictionVersion: bet.lockedPredictionVersion || 'locked_backtest_v1',
 						predictionTopList: Array.isArray(bet.predictionTopList) ? bet.predictionTopList.slice(0, 2) : [bet.state1, bet.state2],
 						predictionCombo: bet.predictionCombo || bet.combo || `${bet.state1}/${bet.state2}`,
-						modelChoices: Array.isArray(bet.modelChoices) ? bet.modelChoices.map(x => ({
-							model: x.model,
-							choice: x.choice,
-							topList: Array.isArray(x.topList) ? x.topList.slice(0, 2) : (x.choice ? [x.choice] : []),
-							weight: Number.isFinite(parseFloat(x.weight)) ? parseFloat(x.weight) : 0
-						})) : []
+						modelChoices: Array.isArray(bet.modelChoices) ? bet.modelChoices.map(sanitizeModelChoice).filter(Boolean) : []
 				});
 			} else if (bet.status && bet.status !== 'target_reached') {
 				// 空仓、风控暂停也写入固定历史快照，避免当前行跨期消失造成“历史漂移”的感觉。
@@ -2021,6 +2298,8 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 					status: bet.status,
 					strategy: bet.strategy || SIM_STRATEGY_VERSION,
 					stage: bet.stage || '',
+					ladderStep: bet.ladderStep ?? 0,
+					ladderMultiplier: bet.ladderMultiplier || 1,
 					ratio: bet.ratio || 0,
 					windowSize: bet.windowSize || null,
 					riskReason: bet.riskReason || '',
@@ -2033,26 +2312,10 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 						lockedPredictionVersion: bet.lockedPredictionVersion || 'locked_backtest_v1',
 						predictionTopList: Array.isArray(bet.predictionTopList) ? bet.predictionTopList.slice(0, 2) : [bet.state1, bet.state2].filter(Boolean),
 						predictionCombo: bet.predictionCombo || bet.combo || '',
-						modelChoices: Array.isArray(bet.modelChoices) ? bet.modelChoices.map(x => ({
-							model: x.model,
-							choice: x.choice,
-							topList: Array.isArray(x.topList) ? x.topList.slice(0, 2) : (x.choice ? [x.choice] : []),
-							weight: Number.isFinite(parseFloat(x.weight)) ? parseFloat(x.weight) : 0
-						})) : []
+						modelChoices: Array.isArray(bet.modelChoices) ? bet.modelChoices.map(sanitizeModelChoice).filter(Boolean) : []
 				});
 			}
 
-			if (bet.status === 'paused' && simStats.pauseRounds <= 0) {
-				if ((bet.pauseMode || simStats.pauseMode) === 'loss5') {
-					// 连亏第 5 期亏损后，从下一期开始的 4 期停注已完成，重置连亏并继续循环。
-					simStats.lossStreak = 0;
-					simStats.winStreak = 0;
-				}
-				simStats.pauseMode = '';
-				simStats.pauseTotalRounds = 0;
-				simStats.pauseUsedRounds = 0;
-				simStats.pauseStartAfterPeriod = '';
-			}
 
 			simStats.lastPeriod = actualItem.period;
 			simStats.pendingBet = null;
@@ -2137,61 +2400,63 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 
 			if (simStats.pendingBet) {
 				const bet = simStats.pendingBet;
-				let statusText = '⏳ 已锁单，待开奖结算';
+				let statusText = '待开奖';
 				let statusColor = '#ffd700';
-				let logComboTag = bet.combo || '--';
+				const comboText = (bet.state1 && bet.state2) ? `${bet.state1}/${bet.state2}` : (bet.combo || '--');
 				let currentBetDisplay = '￥0';
+
 				if (bet.status === 'locked' && bet.betAmount > 0) {
-					currentBetDisplay = `<span style="color:#aaa;">${bet.state1}</span> <span style="color:#ffd700; font-family:monospace;">${bet.bet1}</span><br><span style="color:#aaa;">${bet.state2}</span> <span style="color:#ffd700; font-family:monospace;">${bet.bet2}</span><br><span style="font-size:9px; color:#777; font-weight:normal;">${bet.stage || ''} ${(bet.ratio ? `｜总仓${(bet.ratio * 100).toFixed(1)}%` : '')}</span>`;
+					currentBetDisplay = `<span style="color:#aaa;">${bet.state1}</span> <span style="color:#ffd700;font-family:monospace;">￥${bet.bet1}</span><br><span style="color:#aaa;">${bet.state2}</span> <span style="color:#ffd700;font-family:monospace;">￥${bet.bet2}</span>`;
 				} else if (bet.status === 'target_reached') {
-					statusText = '🎉 目标达成停注';
+					statusText = '已停注';
 					statusColor = '#00b894';
-					currentBetDisplay = `<span style="color:#00b894; font-weight:bold;">已达标放假</span>`;
+					currentBetDisplay = '￥0';
 				} else if (bet.status === 'paused') {
-					statusText = '🛡 连亏停注';
+					statusText = '已暂停';
 					statusColor = '#00f0ff';
-					currentBetDisplay = `<span style="color:#00f0ff; font-weight:bold;">${bet.riskReason || '暂停下注'}</span>`;
+					currentBetDisplay = '￥0';
 				} else {
-					statusText = '🛑 空仓观望中';
+					statusText = '未下注';
 					statusColor = '#888';
 				}
-				const lockedText = bet.lockedAt ? `<br><span style="font-size:9px; color:#777; font-weight:normal;">锁单 ${formatLockTime(bet.lockedAt)}</span>` : '';
-				const riskText = bet.riskReason ? `<br><span style="font-size:9px; color:#777; font-weight:normal;">${bet.riskReason}</span>` : '';
+
 				htmlBuffer += `
-					<tr style="background: rgba(0, 240, 255, 0.08); border-left: 3px solid var(--glow-blue);">
-						<td style="padding: 10px 4px; color: var(--glow-blue); font-weight: bold;">${bet.period} <span style="font-size:9px; font-weight:normal; opacity:0.7;">(当前锁单)</span>${lockedText}</td>
-						<td style="padding: 10px 4px;"><span class="combo-badge" style="font-size:10px; padding:2px 6px; border-color: var(--glow-blue); color: var(--glow-blue); background: rgba(0,240,255,0.02);">${logComboTag}</span>${riskText}</td>
-						<td style="padding: 10px 4px; font-weight:bold; line-height:1.4; text-align:left; padding-left:14px;">${currentBetDisplay}</td>
-						<td style="padding: 10px 4px; color:${statusColor}; font-weight:bold;">${statusText}</td>
-						<td style="padding: 10px 4px; color:#aaa; font-family:'Courier New',monospace;">--</td>
+					<tr style="background:rgba(0,240,255,0.07);border-left:3px solid var(--glow-blue);">
+						<td style="padding:8px 3px;color:var(--glow-blue);font-weight:bold;">${bet.period}</td>
+						<td style="padding:8px 3px;"><span class="combo-badge" style="font-size:10px;padding:2px 6px;border-color:var(--glow-blue);color:var(--glow-blue);background:rgba(0,240,255,0.02);">${comboText}</span></td>
+						<td style="padding:8px 3px;font-weight:bold;line-height:1.35;text-align:left;padding-left:8px;">${currentBetDisplay}</td>
+						<td style="padding:8px 3px;color:${statusColor};font-weight:bold;">${statusText}</td>
+						<td style="padding:8px 3px;color:#777;font-family:'Courier New',monospace;">--</td>
 					</tr>`;
 			} else if (historyData && historyData.length > 0) {
-				htmlBuffer += `<tr style="background: rgba(255, 215, 0, 0.06);"><td colspan="5" class="small" style="color:#ffd700; padding:12px; text-align:center;">⏳ 等待系统生成下一期锁单</td></tr>`;
+				htmlBuffer += `<tr><td colspan="5" class="small" style="color:#777;padding:10px;text-align:center;">等待下一期</td></tr>`;
 			}
 
 			if ((!simStats.logs || simStats.logs.length === 0) && htmlBuffer === '') {
-				tbody.innerHTML = '<tr><td colspan="5" class="small" style="color:#555; padding:20px; text-align:center;">💡 暂无模拟投注明细流水</td></tr>';
+				tbody.innerHTML = '<tr><td colspan="5" class="small" style="color:#555;padding:14px;text-align:center;">暂无记录</td></tr>';
 				return;
 			}
+
 			const displayLogs = simStats.logs.slice().reverse();
 			displayLogs.forEach(log => {
 				const netColor = log.netProfit > 0 ? '#00b894' : (log.netProfit < 0 ? '#ff4757' : '#ffd700');
 				const netSign = log.netProfit > 0 ? '+' : '';
+				const comboText = (log.state1 && log.state2) ? `${log.state1}/${log.state2}` : (log.combo || '--');
 				let logBetDisplay = `￥${log.betAmount}`;
+
 				if (log.state1 && log.state2 && log.bet1 !== undefined && log.betAmount > 0) {
-					logBetDisplay = `<span style="color:#888;">${log.state1}</span> <span style="font-family:monospace;">${log.bet1}</span><br><span style="color:#888;">${log.state2}</span> <span style="font-family:monospace;">${log.bet2}</span>`;
-				} else if (log.status === 'paused') {
-					logBetDisplay = `<span style="color:#00f0ff;font-weight:bold;">停注 0</span>`;
-				} else if (log.status === 'watch') {
-					logBetDisplay = `<span style="color:#888;font-weight:bold;">空仓 0</span>`;
+					logBetDisplay = `<span style="color:#888;">${log.state1}</span> <span style="font-family:monospace;">￥${log.bet1}</span><br><span style="color:#888;">${log.state2}</span> <span style="font-family:monospace;">￥${log.bet2}</span>`;
+				} else if (log.status === 'paused' || log.status === 'watch') {
+					logBetDisplay = '￥0';
 				}
+
 				htmlBuffer += `
 					<tr>
-						<td style="padding: 10px 4px; color:#aaa;">${log.period}</td>
-						<td style="padding: 10px 4px;"><span class="combo-badge" style="font-size:10px; padding:2px 6px;">${log.combo}</span>${log.riskReason ? `<br><span style="font-size:9px;color:#666;">${log.riskReason}</span>` : ''}</td>
-						<td style="padding: 10px 4px; color:#fff; font-weight:bold; line-height:1.4; text-align:left; padding-left:14px;">${logBetDisplay}</td>
-						<td style="padding: 10px 4px; color:${netColor}; font-weight:bold;">${netSign}￥${log.netProfit.toFixed(2)}</td>
-						<td style="padding: 10px 4px; color:#fff; font-family:'Courier New',monospace;">￥${log.balanceAfter.toFixed(2)}</td>
+						<td style="padding:8px 3px;color:#aaa;">${log.period}</td>
+						<td style="padding:8px 3px;"><span class="combo-badge" style="font-size:10px;padding:2px 6px;">${comboText}</span></td>
+						<td style="padding:8px 3px;color:#fff;font-weight:bold;line-height:1.35;text-align:left;padding-left:8px;">${logBetDisplay}</td>
+						<td style="padding:8px 3px;color:${netColor};font-weight:bold;">${netSign}￥${log.netProfit.toFixed(2)}</td>
+						<td style="padding:8px 3px;color:#fff;font-family:'Courier New',monospace;">￥${log.balanceAfter.toFixed(2)}</td>
 					</tr>`;
 			});
 			tbody.innerHTML = htmlBuffer;
@@ -2224,67 +2489,62 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			renderSimHistoryUI();
 		}
 
-		// ==================== 优化3：按50期严格动态评估系统 ====================
+		// ==================== v4.2：真实锁单 Top2 + 概率质量动态评估 ====================
 		function periodicWeightEvaluation() {
 			if (customWeights) return;
-			if (historyData.length < 50) return;
-
-			const latestStr = historyData[historyData.length - 1].period;
-			const latestNum = parseInt(String(latestStr).replace(/\D/g, ''), 10);
-			if (isNaN(latestNum)) return;
-
-			// 首次记录
-			if (!window._lastEvalPeriod) {
-				window._lastEvalPeriod = latestNum;
+			const lockedCount = getLockedPredictionBacktestRecords().length;
+			if (lockedCount < MODEL_DYNAMIC_FILTER.minSample) return;
+			if (!Number.isFinite(window._lastEvalLockedCount)) {
+				window._lastEvalLockedCount = lockedCount;
 				optimizeWeightsDeep50();
 				return;
 			}
-
-			// 满足50期跨度触发重新评估
-			if (Math.abs(latestNum - window._lastEvalPeriod) >= 50) {
-				window._lastEvalPeriod = latestNum;
-				console.log(`[动态评估] 期号已跨越50期，触发模型权重深层重估...`);
+			if (lockedCount - window._lastEvalLockedCount >= 20) {
+				window._lastEvalLockedCount = lockedCount;
 				optimizeWeightsDeep50();
 			}
 		}
 
 		function optimizeWeightsDeep50() {
 			if (customWeights) return;
-			if (historyData.length < 50) return;
-			const winSize = 50; // 严格以最近50期为窗口
-			const start = historyData.length - winSize;
-			const hits = {};
-			models.forEach(m => hits[m.name] = 0);
-			let rounds = 0;
-			for (let i = start; i < historyData.length; i++) {
-				const actual = historyData[i].state;
-				const sub = historyData.slice(0, i);
-				if (sub.length < 10) continue;
-				models.forEach(m => {
-					const scores = m.func(sub);
-					let best = STATES[0], maxS = -Infinity;
-					STATES.forEach(s => { if (scores[s] > maxS) { maxS = scores[s]; best = s; } });
-					if (best === actual) hits[m.name]++;
+			const records = getLockedPredictionBacktestRecords().slice(-100);
+			if (records.length < MODEL_DYNAMIC_FILTER.minSample) return;
+			const rawScores = {};
+			const neutralScore = 0.48;
+			const priorSamples = 30;
+			models.forEach(m => {
+				let samples = 0, top1Hits = 0, top2Hits = 0, qualitySum = 0, qualitySamples = 0;
+				records.forEach(rec => {
+					const choice = (rec.modelChoices || []).find(x => x && x.model === m.name);
+					const evaluation = evaluateModelChoice(choice, rec.actualState);
+					if (!evaluation) return;
+					top1Hits += evaluation.top1Hit;
+					top2Hits += evaluation.top2Hit;
+					if (evaluation.probabilityQuality !== null) { qualitySum += evaluation.probabilityQuality; qualitySamples++; }
+					samples++;
 				});
-				rounds++;
-			}
-			if (rounds > 0) {
-				let totalHit = Object.values(hits).reduce((a, b) => a + b, 0);
-				if (totalHit > 0) {
-					// 指数级放大模型表现差异：命中率越好权重越高，表现差的直接削弱
-					models.forEach(m => {
-						let hitRate = hits[m.name] / rounds;
-						weights[m.name] = Math.max(0.01, Math.pow(hitRate, 2)); // 保留0.01底线学习能力
-					});
-					const sumW = Object.values(weights).reduce((a, b) => a + b, 0);
-					models.forEach(m => weights[m.name] /= sumW);
-				}
-			}
+				if (!samples) { rawScores[m.name] = 0.01; return; }
+				const top1Rate = top1Hits / samples;
+				const top2Rate = top2Hits / samples;
+				const probabilityQuality = qualitySamples ? qualitySum / qualitySamples : (top2Rate * 0.70 + top1Rate * 0.30);
+				const composite = top2Rate * 0.55 + top1Rate * 0.20 + probabilityQuality * 0.25;
+				const shrunk = (composite * samples + neutralScore * priorSamples) / (samples + priorSamples);
+				rawScores[m.name] = Math.max(0.01, Math.pow(shrunk, 3));
+				modelRecentPerformance[m.name] = Object.assign({}, modelRecentPerformance[m.name] || {}, { samples, top1Rate, hitRate: top2Rate, probabilityQuality, composite });
+			});
+			const targetWeights = applyModelGroupCaps(rawScores);
+			const smoothed = {};
+			models.forEach(m => {
+				const oldWeight = Number.isFinite(parseFloat(weights[m.name])) ? parseFloat(weights[m.name]) : 1 / models.length;
+				smoothed[m.name] = oldWeight * 0.80 + targetWeights[m.name] * 0.20;
+			});
+			weights = applyModelGroupCaps(smoothed);
+			try { localStorage.setItem(MODEL_PERF_STATE_KEY, JSON.stringify(modelRecentPerformance)); } catch (e) {}
 			renderWeightsTable();
 		}
 
 
-		// ==================== v4.1.3 真实预测快照 + 多窗口公平结算系统 ====================
+		// ==================== v4.2.0 真实预测快照 + 多窗口公平结算系统 ====================
 		function normalizeWindowComparisonRecord(item, parentActualState = '') {
 			if (!item || typeof item !== 'object') return null;
 			const top = Array.isArray(item.topList) ? item.topList.filter(x => STATES.includes(x)).slice(0, 2) : [];
@@ -2343,6 +2603,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 						actionable: !!s.actionable,
 						version: s.version || PREDICTION_VERSION,
 						source: s.source || 'live_lock',
+						modelChoices: Array.isArray(s.modelChoices) ? s.modelChoices.map(sanitizeModelChoice).filter(Boolean) : [],
 						windowComparisons: comparisons
 					};
 				});
@@ -2352,7 +2613,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				if (!old || (s.settled && !old.settled) || (s.createdAt > old.createdAt && old.settled === s.settled)) dedup[s.period] = s;
 			});
 			predictionStats.snapshots = Object.values(dedup).sort((a, b) => String(a.period).localeCompare(String(b.period), undefined, { numeric: true }));
-			if (predictionStats.snapshots.length > 800) predictionStats.snapshots = predictionStats.snapshots.slice(-800);
+			if (predictionStats.snapshots.length > 500) predictionStats.snapshots = predictionStats.snapshots.slice(-500);
 			return predictionStats;
 		}
 
@@ -2403,6 +2664,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 						actionable: log.status === 'locked' && (log.betAmount || 0) > 0,
 						version: log.lockedPredictionVersion || 'sim_locked_import',
 						source: 'sim_locked_import',
+						modelChoices: Array.isArray(log.modelChoices) ? log.modelChoices.map(sanitizeModelChoice).filter(Boolean) : [],
 						windowComparisons: []
 					});
 					exists.add(String(log.period));
@@ -2442,6 +2704,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				actionable: isActionablePrediction(pred),
 				version: PREDICTION_VERSION,
 				source: 'live_lock',
+				modelChoices: Array.isArray(pred.modelChoices) ? pred.modelChoices.map(sanitizeModelChoice).filter(Boolean) : [],
 				windowComparisons: Array.isArray(pred.windowComparisons) ? pred.windowComparisons.map(item => normalizeWindowComparisonRecord(item, '')).filter(Boolean).slice(0, PREDICTION_WINDOWS.length) : []
 			};
 		}
@@ -2458,7 +2721,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				s.actual = actual.fullFormat || actual.state;
 				s.actualState = actual.state;
 				s.hit = Array.isArray(s.topList) && s.topList.includes(actual.state);
-				// v4.1.3：不只结算最终被选中的窗口，而是把当期所有窗口预测全部同步结算。
+				// v4.2.0：不只结算最终被选中的窗口，而是把当期所有窗口预测全部同步结算。
 				if (Array.isArray(s.windowComparisons)) {
 					s.windowComparisons = s.windowComparisons.map(item => {
 						const top = Array.isArray(item.topList) ? item.topList.slice(0, 2) : [];
@@ -2508,6 +2771,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				modelAgreementTotal: snap.modelAgreementTotal || models.length,
 				windowSize: snap.windowSize || DEFAULT_PREDICTION_WINDOW,
 				windowComparisons: snap.windowComparisons || [],
+				modelChoices: Array.isArray(snap.modelChoices) ? snap.modelChoices.map(sanitizeModelChoice).filter(Boolean) : [],
 				lockedAt: snap.createdAt,
 				actionable: snap.actionable
 			};
@@ -2521,9 +2785,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 
 		function updateLockedBacktestPanel() {
 			const settled50 = getSettledPredictionSnapshots(50);
-			const settled100 = getSettledPredictionSnapshots(100);
 			const stats50 = computeSnapshotStats(settled50);
-			const stats100 = computeSnapshotStats(settled100);
 			const setText = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
 			const badge = document.getElementById('locked-accuracy-display');
 			const mainBadge = document.getElementById('accuracy-display');
@@ -2531,18 +2793,16 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				if (badge) badge.innerText = '锁单样本 0';
 				if (mainBadge) mainBadge.innerText = '锁单样本 0';
 				setText('locked-hit-rate', `0 / 0<br><span style="font-size:10px;color:#888;font-weight:normal;">等待开奖后结算</span>`);
-				setText('effective-hit-rate', `--<br><span style="font-size:10px;color:#888;font-weight:normal;">随机基准50%</span>`);
+				setText('effective-hit-rate', `--<br><span style="font-size:10px;color:#888;font-weight:normal;">动态理论基准</span>`);
 				setText('action-hit-rate', `--<br><span style="font-size:10px;color:#888;font-weight:normal;">高置信出手样本0</span>`);
-				setText('locked-backtest-note', '真实锁单回测从 4.1.1 运行后的下一期开奖开始累计；多窗口公平样本会在每次结算时同步增加。');
 				return;
 			}
 			const effColor = stats50.effective >= 0 ? '#00b894' : '#ff4757';
 			if (badge) badge.innerText = `锁单 ${formatPercent(stats50.hitRate)}｜有效 ${formatPercent(stats50.effective, 1, true)}`;
 			if (mainBadge) mainBadge.innerText = `真实锁单 ${formatPercent(stats50.hitRate)} (${stats50.hits}/${stats50.total})｜有效 ${formatPercent(stats50.effective, 1, true)}`;
 			setText('locked-hit-rate', `${stats50.hits} / ${stats50.total}<br><span style="font-size:10px;color:#888;font-weight:normal;">近50锁单 ${formatPercent(stats50.hitRate)}</span>`);
-			setText('effective-hit-rate', `<span style="color:${effColor};">${formatPercent(stats50.effective, 1, true)}</span><br><span style="font-size:10px;color:#888;font-weight:normal;">对比随机50%</span>`);
+			setText('effective-hit-rate', `<span style="color:${effColor};">${formatPercent(stats50.effective, 1, true)}</span><br><span style="font-size:10px;color:#888;font-weight:normal;">理论基准 ${formatPercent(stats50.baselineRate)}</span>`);
 			setText('action-hit-rate', `${stats50.actionHits} / ${stats50.actionTotal}<br><span style="font-size:10px;color:#888;font-weight:normal;">出手 ${formatPercent(stats50.actionRate)}</span>`);
-			setText('locked-backtest-note', `近50锁单：${formatPercent(stats50.hitRate)}，有效命中率 ${formatPercent(stats50.effective, 1, true)}；近100锁单：${stats100.total ? formatPercent(stats100.hitRate) + '，有效 ' + formatPercent(stats100.effective, 1, true) : '样本不足'}。有效命中率=真实命中率-随机基准50%。多窗口样本为公平同步结算样本。`);
 		}
 
 		function renderWindowComparisonPanel(pred) {
@@ -2581,13 +2841,13 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 						border:1px solid ${borderColor};
 						box-shadow:${isSel ? '0 0 14px rgba(255,215,0,0.22)' : 'none'};
 						border-radius:14px;
-						padding:10px 9px;
-						min-height:92px;
+						padding:9px 8px;
+						min-height:82px;
 						opacity:${opacity};
 						display:flex;
 						flex-direction:column;
 						justify-content:space-between;
-						gap:6px;
+						gap:5px;
 					">
 						<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
 							<div style="font-size:14px;font-weight:900;color:${isSel ? '#ffd700' : '#ddd'};">${star}${item.windowSize}期</div>
@@ -2603,11 +2863,9 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 			}).join('');
 
 			el.innerHTML = `
-				<div style="margin-bottom:8px;line-height:1.5;">
-					<b style="color:#ffd700;">多窗口公平自适应：</b>
-					<span style="color:#aaa;">当前选择</span>
-					<b style="color:#fff;">${pred.windowSize || DEFAULT_PREDICTION_WINDOW}期</b>
-					<span style="color:#aaa;">窗口</span>
+				<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px;line-height:1.35;">
+					<b style="color:#ffd700;">多窗口自适应</b>
+					<span style="color:#aaa;">当前 <b style="color:#fff;">${pred.windowSize || DEFAULT_PREDICTION_WINDOW}期</b></span>
 				</div>
 				<div style="
 					display:grid;
@@ -2615,9 +2873,6 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 					gap:8px;
 					margin-top:8px;
 				">${cards}</div>
-				<div style="margin-top:9px;color:#777;font-size:11px;line-height:1.55;">
-					强制显示30/50/80/120/200全部窗口；灰色卡片代表历史数据不足或暂未参与。等样本足够后会自动加入公平结算。
-				</div>
 			`;
 		}
 
@@ -2641,6 +2896,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 
 		// ==================== 数据加载 ====================
 		async function loadData(isSilent = false) {
+			if (!historyData.length) historyData = loadHistoryCache();
 			const btn = document.getElementById("refreshBtn");
 			const statusTag = document.getElementById("engine-status");
 			if (!isSilent) { btn.disabled = true; btn.innerText = "⚡ 穿透跨域通道..."; }
@@ -2691,9 +2947,9 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				}
 				if (parsed.length) {
 					parsed.sort((a, b) => (parseInt(String(a.period).replace(/\D/g, ''), 10) || 0) - (parseInt(String(b.period).replace(/\D/g, ''), 10) || 0));
-					historyData = parsed;
+					historyData = mergeHistoryCache(parsed);
 					lastFetchTimestamp = Date.now();
-					statusTag.innerHTML = `<span class="engine-type" style="background:#00b894; color:#fff;">📡 实时同步成功 v4.1.3 (接口300期｜多窗口公平回测｜窗口卡片显示)</span>`;
+					statusTag.innerHTML = `<span class="engine-type" style="background:#00b894; color:#fff;">📡 实时同步成功 v4.2.0｜历史缓存${historyData.length}/500期</span>`;
 				} else if (!historyData.length) {
 					historyData = getFallbackMock();
 					statusTag.innerHTML = `<span class="engine-type" style="background:#ff4757;">🤖 离线沙盒模式</span>`;
@@ -2887,8 +3143,9 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 				total += val;
 			});
 			if (total === 0) { alert("权重总和不能为0"); return; }
-			customWeights = {};
-			models.forEach(m => customWeights[m.name] = newW[m.name] / total);
+			const normalizedCustom = {};
+			models.forEach(m => normalizedCustom[m.name] = newW[m.name] / total);
+			customWeights = applyModelGroupCaps(normalizedCustom);
 			renderWeightsTable();
 			runCoreAIEngine();
 		}
@@ -2896,7 +3153,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		function resetToAutoWeights() {
 			customWeights = null;
 			modelRecentPerformance = {};
-			window._lastEvalPeriod = null; // 重置周期计数
+			window._lastEvalLockedCount = null; // 重置真实锁单评估计数
 			optimizeWeightsDeep50();
 			renderWeightsTable();
 			runCoreAIEngine();
@@ -2905,6 +3162,7 @@ function __safeGet(k,d=null){try{return localStorage.getItem(k)??d;}catch(e){ret
 		window.onload = function() {
 			initCountdown();
 			resetRevealState();
+			historyData = loadHistoryCache();
 			loadPredictionStats();
 			loadSimulationStats();
 			loadData(false);
